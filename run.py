@@ -40,13 +40,7 @@ if __name__ == "__main__":
                 # "HardwireAIE",
             ]
         )
-        random_race = random.choice(
-            [
-                Race.Zerg,
-                # Race.Terran,
-                # Race.Protoss
-            ]
-        )
+        random_race = random.choice([Race.Zerg, Race.Terran, Race.Protoss])
         print("Starting local game...")
         run_game(
             maps.get(random_map),
@@ -57,7 +51,6 @@ if __name__ == "__main__":
                 # bot2,
             ],
             realtime=False,
-            # save_replay_as="ZvTMuta.SC2Replay",
             # 2 lower spawn / 2564 upper spawn
             # random_seed=2,
         )

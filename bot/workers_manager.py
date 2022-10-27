@@ -26,7 +26,7 @@ class WorkersManager:
         "geyser_to_list_of_workers",
         "enemy_committed_worker_rush",
         "worker_defence_tags",
-        "EARLY_DEFENCE_AGAINST",
+        "long_distance_mfs"
     )
 
     def __init__(self, ai: BotAI, unit_roles: UnitRoles) -> None:
@@ -46,6 +46,7 @@ class WorkersManager:
         self.geyser_to_list_of_workers: Dict[int, Set[int]] = {}
         self.enemy_committed_worker_rush: bool = False
         self.worker_defence_tags: Set = set()
+        self.long_distance_mfs: Units = Units([], self.ai)
 
     @property
     def available_minerals(self) -> Units:
@@ -87,7 +88,7 @@ class WorkersManager:
     def select_worker(self, target_position: Point2) -> Optional[Unit]:
         """
         Note: Make sure to change the worker role once selected. Otherwise, it is selected to mine again
-        This doesn't select workers from geysers, so make sure to remove workers from gas if low on drones
+        This doesn't select workers from geysers, so make sure to remove workers from gas if low on workers
         """
         workers: Units = self.ai.workers.tags_in(self.worker_to_mineral_patch_dict)
         # there is a chance we have no workers
@@ -165,7 +166,7 @@ class WorkersManager:
 
     def _assign_worker_to_gas_buildings(self, gas_buildings: Units) -> None:
         """
-        We only assign one worker per step, with the hope of grabbing drones on far mineral patches
+        We only assign one worker per step, with the hope of grabbing workers on far mineral patches
         @param gas_buildings:
         @return:
         """
@@ -212,7 +213,7 @@ class WorkersManager:
                 self.worker_tag_to_townhall_tag[
                     worker.tag
                 ] = self.ai.townhalls.closest_to(gas).tag
-                # if this drone was collecting minerals, we need to remove it
+                # if this worker was collecting minerals, we need to remove it
                 self.remove_worker_from_mineral(worker.tag)
                 break
 
@@ -272,6 +273,7 @@ class WorkersManager:
         if not workers or not self.ai.townhalls:
             return
 
+        calculated_long_distance_mfs: bool = False
         gas_buildings: Dict[int, Unit] = {gas.tag: gas for gas in self.ai.gas_buildings}
         minerals: Dict[int, Unit] = {
             mineral.tag: mineral for mineral in self.ai.mineral_field
@@ -305,10 +307,14 @@ class WorkersManager:
                 ):
                     worker.gather(gas_building)
 
-            elif mineral_fields := self.ai.mineral_field.filter(
-                lambda mf: not self.ai.townhalls.closer_than(15.0, mf.position)
-            ):
-                worker.gather(mineral_fields.closest_to(worker))
+            else:
+                if not worker.is_carrying_resource and not worker.is_gathering:
+                    if not calculated_long_distance_mfs:
+                        self.long_distance_mfs = self.ai.mineral_field.filter(
+                            lambda mf: not self.ai.townhalls.closer_than(15.0, mf.position)
+                        )
+                        calculated_long_distance_mfs = True
+                    worker.gather(self.long_distance_mfs.closest_to(worker))
 
     def remove_worker_from_mineral(self, worker_tag: int) -> None:
         """

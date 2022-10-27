@@ -8,7 +8,7 @@ from sc2.units import Units
 
 
 class UnitRoles:
-    __slots__ = "ai", "unit_role_dict", "tag_to_role_dict", "all_assigned_tags"
+    __slots__ = "ai", "unit_role_dict", "tag_to_role_dict", "all_assigned_tags", "WORKER_TYPES"
 
     def __init__(self, ai: BotAI):
         self.ai: BotAI = ai
@@ -17,6 +17,7 @@ class UnitRoles:
         }
         self.tag_to_role_dict: Dict[int, UnitRoleTypes] = {}
         self.all_assigned_tags: Set[int] = set()
+        self.WORKER_TYPES: Set[UnitTypeId] = {UnitTypeId.SCV, UnitTypeId.MULE}
 
     def assign_role(self, tag: int, role: UnitRoleTypes) -> None:
         """
@@ -35,7 +36,7 @@ class UnitRoles:
                 self.unit_role_dict[role].remove(tag)
 
     def catch_unit(self, unit: Unit) -> None:
-        if unit.type_id == UnitTypeId.SCV:
+        if unit.type_id in self.WORKER_TYPES:
             self.assign_role(unit.tag, UnitRoleTypes.GATHERING)
         else:
             self.assign_role(unit.tag, UnitRoleTypes.ATTACKING)

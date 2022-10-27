@@ -48,9 +48,7 @@ class Macro:
         await self._build_supply(iteration, available_scvs)
         self._produce_workers()
         await self._build_barracks_and_addons(available_scvs)
-        # don't make army till orbitals have started
-        if not self.state.ccs:
-            self._produce_army()
+        self._produce_army()
 
         # 2 townhalls at all times
         if (
@@ -195,14 +193,17 @@ class Macro:
 
     def _build_refineries(self, available_scvs: Units):
         # 2 gas buildings
-        max_gas: int = 0 if len(self.ai.townhalls) < 2 else 2
+        max_gas: int = (
+            2
+            if len(self.state.barracks) >= 5
+            else (1 if len(self.state.barracks) >= 3 else 0)
+        )
         current_gas_num = (
             self.ai.already_pending(UnitTypeId.REFINERY) + self.ai.gas_buildings.amount
         )
         # Build refineries (on nearby vespene) when at least one barracks is in construction
         if (
             current_gas_num >= max_gas
-            or len(self.state.barracks) < 2
             or not self.ai.can_afford(UnitTypeId.REFINERY)
             or not available_scvs
         ):
