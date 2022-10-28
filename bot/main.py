@@ -1,3 +1,4 @@
+from bot.squad_agent.base_agent import BaseAgent
 from sc2.bot_ai import BotAI
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
@@ -9,19 +10,23 @@ from bot.unit_roles import UnitRoles
 from bot.unit_squads import UnitSquads
 from bot.workers_manager import WorkersManager
 
+from bot.squad_agent.random_agent import RandomAgent
+
 
 class Kitten(BotAI):
     __slots__ = "unit_roles", "unit_squads", "workers_manager", "macro"
 
     def __init__(self):
         super().__init__()
+        self.agent: BaseAgent = RandomAgent(self)
         self.unit_roles: UnitRoles = UnitRoles(self)
-        self.unit_squads: UnitSquads = UnitSquads(self, self.unit_roles)
+        self.unit_squads: UnitSquads = UnitSquads(self, self.unit_roles, self.agent)
         self.workers_manager: WorkersManager = WorkersManager(self, self.unit_roles)
         self.macro: Macro = Macro(self, self.unit_roles, self.workers_manager)
 
     async def on_start(self) -> None:
         self.client.game_step = 4
+        self.agent.get_episode_data()
         for worker in self.units(UnitTypeId.SCV):
             worker.gather(self.mineral_field.closest_to(worker))
             self.unit_roles.catch_unit(worker)

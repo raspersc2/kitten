@@ -2,11 +2,13 @@
 Create and manage unit squad bookkeeping.
 Note: squad actions are carried out in `unit_squad.py`
 """
-
+import logging
 import uuid
 from typing import Set, Dict, Any, List, Optional
+from loguru import logger
 
-from bot.consts import UnitRoleTypes
+from bot.consts import UnitRoleTypes, SQUAD_ACTIONS
+from bot.squad_agent.base_agent import BaseAgent
 from bot.unit_roles import UnitRoles
 from bot.unit_squad import UnitSquad
 from sc2.bot_ai import BotAI
@@ -18,6 +20,7 @@ class UnitSquads:
     __slots__ = (
         "ai",
         "unit_roles",
+        "agent",
         "assigned_unit_tags",
         "squads",
         "squads_dict",
@@ -26,10 +29,11 @@ class UnitSquads:
         "TAGS",
     )
 
-    def __init__(self, ai: BotAI, unit_roles: UnitRoles):
+    def __init__(self, ai: BotAI, unit_roles: UnitRoles, agent: BaseAgent):
 
         self.ai: BotAI = ai
         self.unit_roles: UnitRoles = unit_roles
+        self.agent: BaseAgent = agent
 
         self.squads: List[UnitSquad] = []
 
@@ -73,7 +77,15 @@ class UnitSquads:
         ) = self._get_largest_squad(self.squads)
 
         for squad in self.squads:
+            # for the main squad, we use the agent to decide on an action
             if squad.squad_id == id_of_largest_squad:
+                action: int = self.agent.choose_action(
+                    self.squads,
+                    pos_of_largest_squad,
+                    Units([], self.ai),
+                    Units([], self.ai),
+                )
+                logger.info(f"Chosen action: {SQUAD_ACTIONS[action]}")
                 for unit in squad.squad_units:
                     unit.attack(self.ai.enemy_start_locations[0])
             else:
