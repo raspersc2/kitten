@@ -24,6 +24,7 @@ class UnitSquads:
         "assigned_unit_tags",
         "squads",
         "squads_dict",
+        "AGENT_FRAME_SKIP",
         "SQUAD_OBJECT",
         "SQUAD_RADIUS",
         "TAGS",
@@ -40,11 +41,13 @@ class UnitSquads:
         self.assigned_unit_tags: Set[int] = set()
         self.squads_dict: Dict[str, Dict[str, Any]] = dict()
 
+        # How often we get a new squad action (22.4 FPS)
+        self.AGENT_FRAME_SKIP: int = 20
         self.SQUAD_OBJECT: str = "squad_object"
         self.SQUAD_RADIUS: float = 15.0
         self.TAGS: str = "tags"
 
-    def update(self) -> None:
+    def update(self, iteration: int) -> None:
         army: Units = self.unit_roles.get_units_from_role(UnitRoleTypes.ATTACKING)
 
         # handle unit squad assignment not currently in our records
@@ -54,7 +57,7 @@ class UnitSquads:
         # update the unit collections associated with each squad
         self._regenerate_squad_units(army)
         # control the unit squads
-        self._handle_squads()
+        self._handle_squads(iteration)
 
     def remove_tag(self, tag: int) -> None:
         """'on_unit_destroyed' calls this"""
@@ -69,7 +72,7 @@ class UnitSquads:
             if found_squad:
                 self._remove_unit_tag(tag, squad_id_to_remove_from)
 
-    def _handle_squads(self) -> None:
+    def _handle_squads(self, iteration: int) -> None:
         (
             id_of_largest_squad,
             pos_of_largest_squad,
@@ -78,14 +81,18 @@ class UnitSquads:
 
         for squad in self.squads:
             # for the main squad, we use the agent to decide on an action
+            # aim for a new agent action once every 20 frames
+            # the individual unit squad scripted control will be based on this action
             if squad.squad_id == id_of_largest_squad:
-                action: int = self.agent.choose_action(
-                    self.squads,
-                    pos_of_largest_squad,
-                    Units([], self.ai),
-                    Units([], self.ai),
-                )
-                logger.info(f"Chosen action: {SQUAD_ACTIONS[action]}")
+                # update the action once every 20 frames (just under once per second (in-game time))
+                if iteration % (self.AGENT_FRAME_SKIP // self.ai.client.game_step) == 0:
+                    action: int = self.agent.choose_action(
+                        self.squads,
+                        pos_of_largest_squad,
+                        Units([], self.ai),
+                        squad.squad_units,
+                    )
+                    logger.info(f"Chosen action: {SQUAD_ACTIONS[action]}")
                 for unit in squad.squad_units:
                     unit.attack(self.ai.enemy_start_locations[0])
             else:
