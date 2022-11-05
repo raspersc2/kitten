@@ -1,18 +1,14 @@
 from typing import Optional, Dict, List
 
 import numpy as np
-
-from sc2.position import Point2
-
-from sc2.unit import Unit
-
-from sc2.units import Units
+from scipy import spatial
 
 from MapAnalyzer import MapData
-from sc2.bot_ai import BotAI
-import cv2
-
 from bot.consts import ALL_STRUCTURES, INFLUENCE_COSTS
+from sc2.bot_ai import BotAI
+from sc2.position import Point2
+from sc2.unit import Unit
+from sc2.units import Units
 
 
 class Pathing:
@@ -82,6 +78,70 @@ class Pathing:
             self.remove_unit_tag(tag)
 
         self.map_data.draw_influence_in_game(self.ground_grid)
+
+    def find_closest_safe_spot(
+        self, from_pos: Point2, grid: np.ndarray, radius: int = 15
+    ) -> Point2:
+        """
+        @param from_pos:
+        @param grid:
+        @param radius:
+        @return:
+        """
+        all_safe: np.ndarray = self.map_data.lowest_cost_points_array(
+            from_pos, radius, grid
+        )
+        # type hint wants a numpy array but doesn't actually need one - this is faster
+        all_dists = spatial.distance.cdist(all_safe, [from_pos], "sqeuclidean")
+        min_index = np.argmin(all_dists)
+
+        # safe because the shape of all_dists (N x 1) means argmin will return an int
+        return Point2(all_safe[min_index])
+
+    def find_path_next_point(
+        self,
+        start: Point2,
+        target: Point2,
+        grid: np.ndarray,
+        sensitivity: int = 2,
+        smoothing: bool = False,
+    ) -> Point2:
+        """
+        Most commonly used, we need to calculate the right path for a unit
+        But only the first element of the path is required
+        @param start:
+        @param target:
+        @param grid:
+        @param sensitivity:
+        @param smoothing:
+        @return: The next point on the path we should move to
+        """
+        # Note: On rare occasions a path is not found and returns `None`
+        path: Optional[List[Point2]] = self.map_data.pathfind(
+            start, target, grid, sensitivity=sensitivity, smoothing=smoothing
+        )
+        if not path or len(path) == 0:
+            return target
+        else:
+            return path[0]
+
+    @staticmethod
+    def is_position_safe(
+        grid: np.ndarray,
+        position: Point2,
+        weight_safety_limit: float = 1.0,
+    ) -> bool:
+        """
+        Checks if the current position is dangerous by comparing against default_grid_weights
+        @param grid: Grid we want to check
+        @param position: Position of the unit etc
+        @param weight_safety_limit: The threshold at which we declare the position safe
+        @return:
+        """
+        position = position.rounded
+        weight: float = grid[position.x, position.y]
+        # np.inf check if drone is pathing near a spore crawler
+        return weight == np.inf or weight <= weight_safety_limit
 
     def remove_unit_tag(self, unit_tag: int) -> None:
         if unit_tag in self.memory_unit_tags:

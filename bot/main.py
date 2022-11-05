@@ -1,5 +1,6 @@
 from typing import Optional
 
+from bot.botai_ext import BotAIExt
 from bot.pathing import Pathing
 from bot.squad_agent.base_agent import BaseAgent
 from sc2.bot_ai import BotAI
@@ -17,7 +18,7 @@ from bot.squad_agent.random_agent import RandomAgent
 from MapAnalyzer.MapData import MapData
 
 
-class Kitten(BotAI):
+class Kitten(BotAIExt):
     __slots__ = (
         "map_data",
         "unit_roles",
@@ -30,19 +31,21 @@ class Kitten(BotAI):
     def __init__(self):
         super().__init__()
 
+        # initiate in `on_start`
+        self.map_data: Optional[MapData] = None
+        self.pathing: Optional[Pathing] = None
+
         self.agent: BaseAgent = RandomAgent(self)
         self.unit_roles: UnitRoles = UnitRoles(self)
         self.unit_squads: UnitSquads = UnitSquads(self, self.unit_roles, self.agent)
         self.workers_manager: WorkersManager = WorkersManager(self, self.unit_roles)
         self.macro: Macro = Macro(self, self.unit_roles, self.workers_manager)
-        # initiate in `on_start`
-        self.map_data: Optional[MapData] = None
-        self.pathing: Optional[Pathing] = None
 
     async def on_start(self) -> None:
         self.map_data = MapData(self)
         self.pathing = Pathing(self, self.map_data)
-        self.client.game_step = 4
+        self.client.game_step = 16
+        self.client.raw_affects_selection = True
         self.agent.get_episode_data()
         for worker in self.units(UnitTypeId.SCV):
             worker.gather(self.mineral_field.closest_to(worker))
@@ -50,9 +53,9 @@ class Kitten(BotAI):
 
     async def on_step(self, iteration: int) -> None:
         state: State = State(self)
-        self.unit_squads.update(iteration)
+        await self.unit_squads.update(iteration, self.pathing)
         await self.macro.update(state, iteration)
-        self.workers_manager.update(state)
+        self.workers_manager.update(state, iteration)
         # reasonable assumption the pathing module does not need updating early on
         if self.time > 30.0:
             self.pathing.update(iteration)

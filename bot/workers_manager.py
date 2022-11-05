@@ -26,7 +26,7 @@ class WorkersManager:
         "geyser_to_list_of_workers",
         "enemy_committed_worker_rush",
         "worker_defence_tags",
-        "long_distance_mfs"
+        "long_distance_mfs",
     )
 
     def __init__(self, ai: BotAI, unit_roles: UnitRoles) -> None:
@@ -72,10 +72,11 @@ class WorkersManager:
 
         return available_minerals
 
-    def update(self, state: State) -> None:
+    def update(self, state: State, iteration: int) -> None:
         gatherers: Units = self.unit_roles.get_units_from_role(UnitRoleTypes.GATHERING)
         self._assign_workers(gatherers)
-        self._collect_resources(gatherers)
+        if iteration % 4 == 0:
+            self._collect_resources(gatherers)
 
         for oc in state.orbitals.filter(lambda x: x.energy >= 50):
             mfs: Units = self.ai.mineral_field.closer_than(10, oc)
@@ -288,12 +289,14 @@ class WorkersManager:
                     self._remove_mineral_field(mineral_tag)
                     continue
 
-                if worker.is_carrying_vespene:
-                    worker.return_resource()
-                elif not worker.is_carrying_minerals and (
-                    not worker.is_gathering or worker.order_target != mineral.tag
+                if (
+                    not worker.is_carrying_minerals
+                    and worker.order_target != mineral.tag
                 ):
                     worker.gather(mineral)
+                    # to reduce apm only click one scv on to their patch per iteration
+                    # let in-game engine sort things out inbetween
+                    break
             elif worker_tag in self.worker_to_geyser_dict:
                 gas_building_tag: int = self.worker_to_geyser_dict[worker.tag]
                 gas_building: Optional[Unit] = gas_buildings.get(gas_building_tag, None)
@@ -311,7 +314,9 @@ class WorkersManager:
                 if not worker.is_carrying_resource and not worker.is_gathering:
                     if not calculated_long_distance_mfs:
                         self.long_distance_mfs = self.ai.mineral_field.filter(
-                            lambda mf: not self.ai.townhalls.closer_than(15.0, mf.position)
+                            lambda mf: not self.ai.townhalls.closer_than(
+                                15.0, mf.position
+                            )
                         )
                         calculated_long_distance_mfs = True
                     worker.gather(self.long_distance_mfs.closest_to(worker))

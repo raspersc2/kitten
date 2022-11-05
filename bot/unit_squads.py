@@ -2,16 +2,18 @@
 Create and manage unit squad bookkeeping.
 Note: squad actions are carried out in `unit_squad.py`
 """
-import logging
 import uuid
 from typing import Set, Dict, Any, List, Optional
 from loguru import logger
 
-from bot.consts import UnitRoleTypes, SQUAD_ACTIONS
+from bot.botai_ext import BotAIExt
+from bot.pathing import Pathing
+from sc2.ids.ability_id import AbilityId
+
+from bot.consts import UnitRoleTypes, SQUAD_ACTIONS, SquadActionType
 from bot.squad_agent.base_agent import BaseAgent
 from bot.unit_roles import UnitRoles
 from bot.unit_squad import UnitSquad
-from sc2.bot_ai import BotAI
 from sc2.position import Point2
 from sc2.units import Units
 
@@ -24,22 +26,28 @@ class UnitSquads:
         "assigned_unit_tags",
         "squads",
         "squads_dict",
+        "attack_target",
+        "rally_point",
         "AGENT_FRAME_SKIP",
         "SQUAD_OBJECT",
         "SQUAD_RADIUS",
         "TAGS",
     )
 
-    def __init__(self, ai: BotAI, unit_roles: UnitRoles, agent: BaseAgent):
+    def __init__(self, ai: BotAIExt, unit_roles: UnitRoles, agent: BaseAgent):
 
-        self.ai: BotAI = ai
+        self.ai: BotAIExt = ai
         self.unit_roles: UnitRoles = unit_roles
         self.agent: BaseAgent = agent
 
         self.squads: List[UnitSquad] = []
 
         self.assigned_unit_tags: Set[int] = set()
+        # key -> squad_id, value -> tags, squad object
         self.squads_dict: Dict[str, Dict[str, Any]] = dict()
+
+        self.attack_target: Optional[Point2] = None
+        self.rally_point: Optional[Point2] = None
 
         # How often we get a new squad action (22.4 FPS)
         self.AGENT_FRAME_SKIP: int = 20
@@ -47,7 +55,11 @@ class UnitSquads:
         self.SQUAD_RADIUS: float = 15.0
         self.TAGS: str = "tags"
 
-    def update(self, iteration: int) -> None:
+    async def update(self, iteration: int, pathing: Pathing) -> None:
+        if iteration % 8 == 0:
+            self._set_rally_point()
+            self._set_attack_target()
+
         army: Units = self.unit_roles.get_units_from_role(UnitRoleTypes.ATTACKING)
 
         # handle unit squad assignment not currently in our records
@@ -57,7 +69,7 @@ class UnitSquads:
         # update the unit collections associated with each squad
         self._regenerate_squad_units(army)
         # control the unit squads
-        self._handle_squads(iteration)
+        await self._handle_squads(iteration, pathing)
 
     def remove_tag(self, tag: int) -> None:
         """'on_unit_destroyed' calls this"""
@@ -72,7 +84,7 @@ class UnitSquads:
             if found_squad:
                 self._remove_unit_tag(tag, squad_id_to_remove_from)
 
-    def _handle_squads(self, iteration: int) -> None:
+    async def _handle_squads(self, iteration: int, pathing: Pathing) -> None:
         (
             id_of_largest_squad,
             pos_of_largest_squad,
@@ -93,11 +105,34 @@ class UnitSquads:
                         squad.squad_units,
                     )
                     logger.info(f"Chosen action: {SQUAD_ACTIONS[action]}")
-                for unit in squad.squad_units:
-                    unit.attack(self.ai.enemy_start_locations[0])
+                    action_type: SquadActionType = SQUAD_ACTIONS[action]
+                    if action_type == SquadActionType.ATTACK_STUTTER_BACK:
+                        squad.update_action(AbilityId.ATTACK, self.attack_target)
+                    elif action_type == SquadActionType.ATTACK_STUTTER_FORWARD:
+                        squad.update_action(AbilityId.ATTACK, self.attack_target, True)
+                    elif action_type == SquadActionType.MOVE_TO_SAFE_SPOT:
+                        squad.update_action(
+                            AbilityId.MOVE,
+                            pathing.find_closest_safe_spot(
+                                squad.squad_position, pathing.ground_grid
+                            ),
+                        )
+                    elif action_type == SquadActionType.MOVE_TO_MAIN_OFFENSIVE_THREAT:
+                        squad.update_action(AbilityId.MOVE, self.attack_target)
+                    elif action_type == SquadActionType.HOLD_POSITION:
+                        squad.update_action(AbilityId.HOLDPOSITION, self.attack_target)
+                    elif action_type == SquadActionType.RETREAT_TO_RALLY_POINT:
+                        squad.update_action(AbilityId.MOVE, self.rally_point)
+                    elif action_type == SquadActionType.HOLD_POSITION:
+                        squad.update_action(AbilityId.HOLDPOSITION, self.rally_point)
             else:
-                for unit in squad.squad_units:
-                    unit.attack(pos_of_largest_squad)
+                squad.update_action(AbilityId.ATTACK, pos_of_largest_squad)
+
+            await squad.do_action(
+                squad_tags=self.squads_dict[squad.squad_id][self.TAGS],
+                pathing=pathing,
+                main_squad=squad.squad_id == id_of_largest_squad,
+            )
 
     def _squad_assignment(self, unassigned_units: Units) -> None:
         if not unassigned_units:
@@ -132,12 +167,10 @@ class UnitSquads:
                     self._remove_unit_tag(unit.tag, squad_id)
 
         # Multiple squads overlapping -> Merge
-        squads_to_remove = []
         for squad in self.squads:
             squad_id = squad.squad_id
-            merged = self._merge_with_closest_squad(squad_id)
-            # only merge one squad per frame multiple squads merging at once
-            if merged:
+            if self._merge_with_closest_squad(squad_id):
+                # only merge one squad per frame, makes managing this somewhat easier
                 break
 
     def _closest_squad_id(
@@ -264,8 +297,31 @@ class UnitSquads:
                 )
                 continue
 
-            self.squads_dict[squad_id][self.SQUAD_OBJECT].squad_units = squad_units
+            self.squads_dict[squad_id][self.SQUAD_OBJECT].set_squad_units(squad_units)
 
         # remove any squads with empty units
         for squad_to_remove in squads_to_remove:
             self._remove_squad(squad_to_remove["id"])
+
+    def _set_rally_point(self):
+        if len(self.ai.townhalls) > 1:
+            self.rally_point = self.ai.townhalls.furthest_to(
+                self.ai.start_location
+            ).position.towards(self.ai.game_info.map_center, 5)
+        else:
+            self.rally_point = self.ai.main_base_ramp.top_center
+
+    def _set_attack_target(self) -> None:
+        if enemy_units := self.ai.enemy_units:
+            center_mass, num = self.ai.center_mass(enemy_units)
+            if num >= 5:
+                self.attack_target = center_mass
+                return
+
+        if enemy_structures := self.ai.enemy_structures:
+            self.attack_target = enemy_structures.closest_to(
+                self.ai.game_info.map_center
+            ).position
+            return
+
+        self.attack_target = self.ai.enemy_start_locations[0]

@@ -32,11 +32,10 @@ class Macro:
         if len(self.ai.townhalls) > 1:
             self.max_workers = 41
 
-        building_scvs: Units = self.unit_roles.get_units_from_role(
+        if building_scvs := self.unit_roles.get_units_from_role(
             UnitRoleTypes.BUILDING
-        )
-        for scv in building_scvs:
-            if len(scv.orders) == 0:
+        ).filter(lambda u: u.is_idle):
+            for scv in building_scvs:
                 self.unit_roles.assign_role(scv.tag, UnitRoleTypes.GATHERING)
 
         available_scvs: Units = self.unit_roles.get_units_from_role(
