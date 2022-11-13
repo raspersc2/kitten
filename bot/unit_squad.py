@@ -1,4 +1,4 @@
-from typing import Set, Union, Optional
+from typing import Set, Union, Optional, Dict
 
 from bot.pathing import Pathing
 from sc2.unit import Unit
@@ -18,6 +18,7 @@ class UnitSquad:
         "current_action",
         "current_action_position",
         "stutter_forward",
+        "stuttering",
         "action_updated_this_step",
     )
 
@@ -31,6 +32,8 @@ class UnitSquad:
         self.current_action_position: Point2 = self.ai.game_info.map_center
         # if set to False, units will kite back by default
         self.stutter_forward: bool = False
+        # if we store this, then the stutter action is only issued once
+        self.stuttering: bool = False
 
         self.action_updated_this_step: bool = False
 
@@ -55,12 +58,12 @@ class UnitSquad:
         else:
 
             if self.current_action == AbilityId.HOLDPOSITION:
-                moving: bool = False
+                perform_action: bool = False
                 for unit in self.squad_units:
-                    if unit.is_moving:
-                        moving = True
+                    if not unit.is_using_ability(AbilityId.HOLDPOSITION):
+                        perform_action = True
                         break
-                if moving:
+                if perform_action:
                     await self.ai.give_units_same_order(
                         AbilityId.HOLDPOSITION, squad_tags
                     )
@@ -68,10 +71,6 @@ class UnitSquad:
                 await self._do_squad_attack_action(squad_tags, pathing)
             else:
                 await self._do_squad_move_action(squad_tags, pathing)
-
-            await self.ai.give_units_same_order(
-                self.current_action, squad_tags, self.current_action_position
-            )
 
     async def _do_scripted_squad_action(self, squad_tags: Set[int]) -> None:
         """
@@ -92,31 +91,49 @@ class UnitSquad:
             self.current_action, squad_tags, self.current_action_position
         )
 
-    def avg_weapon_cooldown(self) -> float:
-        return sum([u.weapon_cooldown for u in self.squad_units]) / len(
-            self.squad_units
-        )
+    def should_stutter(self, close_enemy: Dict[int, Units]) -> bool:
+        avg_weapon_cooldown: float = sum(
+            [u.weapon_cooldown for u in self.squad_units]
+        ) / len(self.squad_units)
+        # all weapons are ready, should stay on attack command
+        if avg_weapon_cooldown == 0.0:
+            return False
+
+        if self.stutter_forward:
+            # if all units are in range of something, don't worry about moving
+            all_in_range: bool = True
+            for unit in self.squad_units:
+                enemy: Units = close_enemy[unit.tag]
+                if not enemy.in_attack_range_of(unit):
+                    all_in_range = False
+                    break
+            if all_in_range:
+                return False
+            return avg_weapon_cooldown > 3.5
+        else:
+            return avg_weapon_cooldown > 5.5
 
     async def _do_squad_attack_action(
         self, squad_tags: Set[int], pathing: Pathing
     ) -> None:
-        avg_cooldown: float = self.avg_weapon_cooldown()
-        close_enemy: Units = self.ai.enemy_units.closer_than(15.0, self.squad_position)
+        close_enemy: Dict[int, Units] = self.ai.enemies_in_range(self.squad_units, 15.0)
+        should_stutter: bool = self.should_stutter(close_enemy)
         sample_unit: Unit = self.squad_units[0]
+
         # all units weapons are ready, fire!
-        if avg_cooldown == 0.0:
-            if not sample_unit.is_attacking:
-                await self.ai.give_units_same_order(
-                    self.current_action,
-                    squad_tags,
-                    self.current_action_position,
-                )
+        if not should_stutter and not sample_unit.is_attacking:
+            self.stuttering = False
+            await self.ai.give_units_same_order(
+                self.current_action,
+                squad_tags,
+                self.current_action_position,
+            )
         # else move depending on the agent's action type
-        else:
+        elif should_stutter and not self.stuttering:
+            # only call this once till weapons are ready again, so action isn't spammed
+            self.stuttering = True
             if self.stutter_forward:
-                pos: Point2 = (
-                    close_enemy.center if close_enemy else self.current_action_position
-                )
+                pos: Point2 = self.current_action_position
             else:
                 # get a path back home, and kite back using that
                 pos: Point2 = pathing.find_path_next_point(
@@ -125,13 +142,12 @@ class UnitSquad:
                     grid=pathing.ground_grid,
                     sensitivity=12,
                 )
-            await self.ai.give_units_same_order(self.current_action, squad_tags, pos)
+            await self.ai.give_units_same_order(AbilityId.MOVE, squad_tags, pos)
 
     async def _do_squad_move_action(
         self, squad_tags: Set[int], pathing: Pathing
     ) -> None:
-
-        if self.squad_position.distance_to(self.current_action_position) < 3.0:
+        if self.squad_position.distance_to(self.current_action_position) < 2.0:
             return
 
         sample_unit: Unit = self.squad_units[0]
@@ -140,12 +156,12 @@ class UnitSquad:
             start=self.squad_position,
             target=self.current_action_position,
             grid=pathing.ground_grid,
-            sensitivity=12,
+            sensitivity=5,
         )
         order_target: Optional[int, Point2] = sample_unit.order_target
         if (
             order_target
             and isinstance(order_target, Point2)
-            and order_target.distance_to(pos) > 3.0
+            and order_target.distance_to(pos) > 1.0
         ):
             await self.ai.give_units_same_order(self.current_action, squad_tags, pos)

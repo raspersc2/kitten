@@ -20,10 +20,9 @@ class SquadActionType(Enum):
 SQUAD_ACTIONS: Dict[int, SquadActionType] = {
     0: SquadActionType.ATTACK_STUTTER_BACK,
     1: SquadActionType.ATTACK_STUTTER_FORWARD,
-    2: SquadActionType.MOVE_TO_SAFE_SPOT,
-    3: SquadActionType.MOVE_TO_MAIN_OFFENSIVE_THREAT,
-    4: SquadActionType.RETREAT_TO_RALLY_POINT,
-    5: SquadActionType.HOLD_POSITION,
+    2: SquadActionType.MOVE_TO_MAIN_OFFENSIVE_THREAT,
+    3: SquadActionType.RETREAT_TO_RALLY_POINT,
+    4: SquadActionType.HOLD_POSITION,
 }
 
 

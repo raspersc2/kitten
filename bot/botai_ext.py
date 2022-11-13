@@ -1,6 +1,7 @@
-from typing import Union, List, Set, Tuple, Optional
+from typing import Union, List, Set, Tuple, Optional, Dict
 
 from scipy.spatial.distance import cdist
+from scipy.spatial import KDTree
 
 from sc2.units import Units
 
@@ -14,8 +15,32 @@ from s2clientprotocol import sc2api_pb2 as sc_pb
 
 
 class BotAIExt(BotAI):
+    def __init__(self):
+        self.enemy_tree: Optional[KDTree] = None
+
     async def on_step(self, iteration: int):
         pass
+
+    def enemies_in_range(self, units: Units, distance: float) -> Dict[int, Units]:
+        """
+        Get all enemies in range of multiple units in one call
+        :param units:
+        :param distance:
+        :return: Dictionary: Key -> Unit tag, Value -> Units in range of that unit
+        """
+        if not self.enemy_tree or not self.enemy_units:
+            return {units[index].tag: Units([], self) for index in range(len(units))}
+
+        unit_positions: List[Point2] = [u.position for u in units]
+        in_range_list: List[Units] = []
+        if unit_positions:
+            query_result = self.enemy_tree.query_ball_point(unit_positions, distance)
+            for result in query_result:
+                in_range_units = Units(
+                    [self.enemy_units[index] for index in result], self
+                )
+                in_range_list.append(in_range_units)
+        return {units[index].tag: in_range_list[index] for index in range(len(units))}
 
     @staticmethod
     def center_mass(units: Units, distance: float = 5.0) -> Tuple[Point2, int]:

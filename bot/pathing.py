@@ -29,7 +29,9 @@ class Pathing:
         self.memory_units: Units = Units([], self.ai)
         self.ground_grid: Optional[np.ndarray] = None
         self.TIME_IN_MEMORY: float = 15.0
-        self.RANGE_BUFFER: float = 3.0
+        # this buffer is fairly large, since we are pathing as a squad in this project
+        # rather than precise individual unit control
+        self.RANGE_BUFFER: float = 5.5
 
     def update(self, iteration: int) -> None:
         # TODO: Add effects
@@ -76,8 +78,6 @@ class Pathing:
 
         for tag in tags_to_remove:
             self.remove_unit_tag(tag)
-
-        self.map_data.draw_influence_in_game(self.ground_grid)
 
     def find_closest_safe_spot(
         self, from_pos: Point2, grid: np.ndarray, radius: int = 15

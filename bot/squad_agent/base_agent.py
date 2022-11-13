@@ -160,10 +160,8 @@ class BaseAgent(metaclass=ABCMeta):
         return model, optimizer, checkpoint["epoch"]
 
     @staticmethod
-    def _get_result_id(result) -> int:
-        result_id: int = 1
-        if result == Result.Victory:
-            result_id = 2
-        elif result == Result.Defeat:
-            result_id = 0
-        return result_id
+    def _get_result_id(result: Result) -> int:
+        """
+        Convert Result enum into an integer
+        """
+        return 2 if result == Result.Victory else (0 if result == Result.Defeat else 1)

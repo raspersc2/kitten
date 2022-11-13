@@ -1,6 +1,8 @@
 import random
 import sys
 
+from sc2.bot_ai import BotAI
+
 sys.path.insert(1, "python-sc2")
 
 from sc2 import maps
@@ -11,7 +13,20 @@ from ladder import run_ladder_game
 
 from bot.main import Kitten
 
+
+class DoNothingBot(BotAI):
+    def __init__(self):
+        super().__init__()
+
+    async def on_start(self):
+        pass
+
+    async def on_step(self, iteration):
+        pass
+
+
 bot1 = Bot(Race.Terran, Kitten(), "kitten")
+bot2 = Bot(Race.Zerg, DoNothingBot())
 
 
 def main():
@@ -51,6 +66,7 @@ if __name__ == "__main__":
                 # bot2,
             ],
             realtime=False,
+            # save_replay_as="kitten.SC2Replay",
             # 2 lower spawn / 2564 upper spawn
             # random_seed=2,
         )

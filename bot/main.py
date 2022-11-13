@@ -1,4 +1,6 @@
-from typing import Optional
+from typing import Optional, List
+
+from scipy.spatial import KDTree
 
 from bot.botai_ext import BotAIExt
 from bot.pathing import Pathing
@@ -44,7 +46,7 @@ class Kitten(BotAIExt):
     async def on_start(self) -> None:
         self.map_data = MapData(self)
         self.pathing = Pathing(self, self.map_data)
-        self.client.game_step = 16
+        self.client.game_step = 2
         self.client.raw_affects_selection = True
         self.agent.get_episode_data()
         for worker in self.units(UnitTypeId.SCV):
@@ -52,13 +54,19 @@ class Kitten(BotAIExt):
             self.unit_roles.catch_unit(worker)
 
     async def on_step(self, iteration: int) -> None:
+        unit_position_list: List[List[float]] = [
+            [unit.position.x, unit.position.y] for unit in self.enemy_units
+        ]
+        if unit_position_list:
+            self.enemy_tree = KDTree(unit_position_list)
+
         state: State = State(self)
         await self.unit_squads.update(iteration, self.pathing)
         await self.macro.update(state, iteration)
         self.workers_manager.update(state, iteration)
         # reasonable assumption the pathing module does not need updating early on
-        if self.time > 30.0:
-            self.pathing.update(iteration)
+        # if self.time > 60.0:
+        self.pathing.update(iteration)
 
     async def on_unit_created(self, unit: Unit) -> None:
         self.unit_roles.catch_unit(unit)

@@ -87,7 +87,7 @@ class Macro:
             self.ai.supply_workers >= self.max_workers
             or not self.ai.can_afford(UnitTypeId.SCV)
             or self.ai.supply_left <= 0
-            or not self.ai.townhalls
+            or not self.ai.townhalls.idle
         ):
             return
 

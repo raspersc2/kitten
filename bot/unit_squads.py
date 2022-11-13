@@ -5,6 +5,7 @@ Note: squad actions are carried out in `unit_squad.py`
 import uuid
 from typing import Set, Dict, Any, List, Optional
 from loguru import logger
+from sc2.unit import Unit
 
 from bot.botai_ext import BotAIExt
 from bot.pathing import Pathing
@@ -69,7 +70,8 @@ class UnitSquads:
         # update the unit collections associated with each squad
         self._regenerate_squad_units(army)
         # control the unit squads
-        await self._handle_squads(iteration, pathing)
+        if len(self.squads) > 0:
+            await self._handle_squads(iteration, pathing)
 
     def remove_tag(self, tag: int) -> None:
         """'on_unit_destroyed' calls this"""
@@ -110,13 +112,6 @@ class UnitSquads:
                         squad.update_action(AbilityId.ATTACK, self.attack_target)
                     elif action_type == SquadActionType.ATTACK_STUTTER_FORWARD:
                         squad.update_action(AbilityId.ATTACK, self.attack_target, True)
-                    elif action_type == SquadActionType.MOVE_TO_SAFE_SPOT:
-                        squad.update_action(
-                            AbilityId.MOVE,
-                            pathing.find_closest_safe_spot(
-                                squad.squad_position, pathing.ground_grid
-                            ),
-                        )
                     elif action_type == SquadActionType.MOVE_TO_MAIN_OFFENSIVE_THREAT:
                         squad.update_action(AbilityId.MOVE, self.attack_target)
                     elif action_type == SquadActionType.HOLD_POSITION:
