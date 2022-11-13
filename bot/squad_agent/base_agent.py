@@ -25,6 +25,7 @@ from sc2.units import Units
 class BaseAgent(metaclass=ABCMeta):
     __slots__ = (
         "ai",
+        "config",
         "device",
         "epoch",
         "current_action",
@@ -40,9 +41,10 @@ class BaseAgent(metaclass=ABCMeta):
         "num_actions",
     )
 
-    def __init__(self, ai: BotAI):
+    def __init__(self, ai: BotAI, config: Dict):
         super().__init__()
         self.ai: BotAI = ai
+        self.config: Dict = config
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Using {self.device}")

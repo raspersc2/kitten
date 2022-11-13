@@ -6,6 +6,10 @@ from sc2.ids.unit_typeid import UnitTypeId
 DATA_DIR: str = "./data"
 
 
+class DebugSettings(str, Enum):
+    DEBUG = "Debug"
+
+
 class SquadActionType(Enum):
     ATTACK_MOVE = auto()
     ATTACK_STUTTER_BACK = auto()

@@ -1,15 +1,16 @@
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from scipy.spatial import KDTree
 
 from bot.botai_ext import BotAIExt
 from bot.pathing import Pathing
 from bot.squad_agent.base_agent import BaseAgent
-from sc2.bot_ai import BotAI
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.unit import Unit
+import yaml
 
+from bot.consts import DebugSettings
 from bot.macro import Macro
 from bot.state import State
 from bot.unit_roles import UnitRoles
@@ -28,6 +29,9 @@ class Kitten(BotAIExt):
         "workers_manager",
         "macro",
         "pathing",
+        "CONFIG_FILE",
+        "config",
+        "debug",
     )
 
     def __init__(self):
@@ -37,7 +41,13 @@ class Kitten(BotAIExt):
         self.map_data: Optional[MapData] = None
         self.pathing: Optional[Pathing] = None
 
-        self.agent: BaseAgent = RandomAgent(self)
+        self.config: Dict = dict()
+        self.CONFIG_FILE = "config.yaml"
+        with open(f"{self.CONFIG_FILE}", "r") as config_file:
+            self.config = yaml.safe_load(config_file)
+        self.debug: bool = self.config[DebugSettings.DEBUG]
+
+        self.agent: BaseAgent = RandomAgent(self, self.config)
         self.unit_roles: UnitRoles = UnitRoles(self)
         self.unit_squads: UnitSquads = UnitSquads(self, self.unit_roles, self.agent)
         self.workers_manager: WorkersManager = WorkersManager(self, self.unit_roles)

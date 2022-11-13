@@ -1,5 +1,5 @@
 from random import randint
-from typing import List
+from typing import List, Dict
 
 from loguru import logger
 
@@ -11,8 +11,8 @@ from sc2.units import Units
 
 
 class RandomAgent(BaseAgent):
-    def __init__(self, ai: BotAI):
-        super().__init__(ai)
+    def __init__(self, ai: BotAI, config: Dict):
+        super().__init__(ai, config)
 
     def choose_action(
         self,
