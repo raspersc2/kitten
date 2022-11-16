@@ -1,8 +1,14 @@
 """
 Basic macro that focuses on bio production and upgrades
+This should probably be rewritten / refactored into separate files for anything more complicated
 """
-from typing import Optional, List
+from typing import Optional, List, Set, Tuple
 
+import numpy as np
+from sc2.ids.upgrade_id import UpgradeId
+
+from MapAnalyzer import MapData, Region
+from bot.botai_ext import BotAIExt
 from bot.consts import UnitRoleTypes
 from bot.state import State
 from bot.unit_roles import UnitRoles
@@ -10,22 +16,46 @@ from bot.workers_manager import WorkersManager
 from sc2.bot_ai import BotAI
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
-from sc2.position import Point2
+from sc2.position import Point2, Point3
 from sc2.unit import Unit
 from sc2.units import Units
 
 
 class Macro:
-    __slots__ = "ai", "unit_roles", "workers_manager", "state", "max_workers"
+    __slots__ = (
+        "ai",
+        "unit_roles",
+        "workers_manager",
+        "map_data",
+        "debug",
+        "state",
+        "depot_positions",
+        "max_workers",
+    )
 
     def __init__(
-        self, ai: BotAI, unit_roles: UnitRoles, workers_manager: WorkersManager
+        self,
+        ai: BotAIExt,
+        unit_roles: UnitRoles,
+        workers_manager: WorkersManager,
+        map_data: MapData,
+        debug: bool,
     ):
-        self.ai: BotAI = ai
+        self.ai: BotAIExt = ai
         self.unit_roles: UnitRoles = unit_roles
         self.workers_manager: WorkersManager = workers_manager
+        self.map_data: MapData = map_data
+        self.debug: bool = debug
         self.state: Optional[State] = None
+        ramp = self.ai.main_base_ramp
+        corner_depots = list(ramp.corner_depots)
+        self.depot_positions: List[Point2] = [
+            ramp.depot_in_middle,
+            corner_depots[0],
+            corner_depots[1],
+        ]
         self.max_workers: int = 19
+        self._calculate_supply_placements()
 
     async def update(self, state: State, iteration: int) -> None:
         self.state = state
@@ -46,8 +76,9 @@ class Macro:
         self._build_refineries(available_scvs)
         await self._build_supply(iteration, available_scvs)
         self._produce_workers()
-        await self._build_barracks_and_addons(available_scvs)
+        self._build_addons()
         self._produce_army()
+        await self._build_barracks(available_scvs)
 
         # 2 townhalls at all times
         if (
@@ -59,7 +90,7 @@ class Macro:
             if location:
                 await self._build_structure(
                     UnitTypeId.COMMANDCENTER,
-                    self.state.build_area,
+                    self.state.natural_build_area,
                     available_scvs,
                     specific_location=location,
                 )
@@ -68,6 +99,13 @@ class Macro:
         # but better then nothing
         for structure in self.ai.structures_without_construction_SCVs:
             structure(AbilityId.CANCEL_BUILDINPROGRESS)
+
+        if self.debug:
+            for position in self.depot_positions:
+                pos: Point3 = Point3(
+                    (position.x, position.y, self.ai.get_terrain_z_height(position))
+                )
+                self.ai.client.debug_box2_out(pos)
 
     def _produce_army(self) -> None:
         barracks: Units = self.state.barracks.idle
@@ -101,7 +139,7 @@ class Macro:
             for th in self.state.orbitals.idle:
                 th.train(UnitTypeId.SCV)
 
-    async def _build_supply(self, iteration: int, available_scvs: Units):
+    async def _build_supply(self, iteration: int, available_scvs: Units) -> None:
         # lower existing depots
         if iteration % 12 == 0:
             for depot in self.state.depots.ready:
@@ -118,11 +156,28 @@ class Macro:
         ):
             return
 
-        await self._build_structure(
-            UnitTypeId.SUPPLYDEPOT, self.state.build_area, available_scvs
-        )
+        # try to build depot at one of our precalculated spots
+        if len(self.depot_positions) > 0:
+            pos: Point2 = self.depot_positions[0]
+            # this might rarely happen, remove the point, return and try with new point next time
+            if not self.ai.in_placement_grid(pos):
+                self.depot_positions = self.depot_positions[1:]
+                return
 
-    async def _build_barracks_and_addons(self, available_scvs: Units) -> None:
+            self.depot_positions = self.depot_positions[1:]
+            await self._build_structure(
+                UnitTypeId.SUPPLYDEPOT,
+                self.state.main_build_area,
+                available_scvs,
+                specific_location=pos,
+            )
+        # else generic depot placement
+        else:
+            await self._build_structure(
+                UnitTypeId.SUPPLYDEPOT, self.state.natural_build_area, available_scvs
+            )
+
+    def _build_addons(self) -> None:
         def barracks_points_to_build_addon(sp_position: Point2) -> List[Point2]:
             """Return all points that need to be checked when trying to build an addon. Returns 4 points."""
             addon_offset: Point2 = Point2((2.5, -0.5))
@@ -151,7 +206,8 @@ class Macro:
                     ):
                         b.build(UnitTypeId.BARRACKSTECHLAB)
 
-        max_barracks: int = 2 if len(self.ai.townhalls) <= 1 else 8
+    async def _build_barracks(self, available_scvs: Units) -> None:
+        max_barracks: int = 3 if len(self.ai.townhalls) <= 1 else 8
         rax: Units = self.state.barracks
         if (
             self.ai.tech_requirement_progress(UnitTypeId.BARRACKS) != 1
@@ -162,13 +218,32 @@ class Macro:
             return
 
         await self._build_structure(
-            UnitTypeId.BARRACKS, self.state.build_area, available_scvs
+            UnitTypeId.BARRACKS, self.state.main_build_area, available_scvs
         )
 
     def _manage_upgrades(self):
         ccs: Units = self.state.ccs
         if ccs and self.ai.can_afford(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND):
             ccs.first(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND)
+
+        if techlabs := self.ai.structures.filter(
+            lambda u: u.type_id == UnitTypeId.BARRACKSTECHLAB and u.is_idle
+        ):
+            if self.ai.already_pending_upgrade(
+                UpgradeId.SHIELDWALL
+            ) == 0 and self.ai.can_afford(UpgradeId.SHIELDWALL):
+                self.ai.research(UpgradeId.SHIELDWALL)
+                return
+            if self.ai.already_pending_upgrade(
+                UpgradeId.STIMPACK
+            ) == 0 and self.ai.can_afford(UpgradeId.STIMPACK):
+                self.ai.research(UpgradeId.STIMPACK)
+                return
+            if self.ai.already_pending_upgrade(
+                UpgradeId.PUNISHERGRENADES
+            ) == 0 and self.ai.can_afford(UpgradeId.PUNISHERGRENADES):
+                self.ai.research(UpgradeId.PUNISHERGRENADES)
+                return
 
     async def _build_structure(
         self,
@@ -221,3 +296,32 @@ class Macro:
                 self.workers_manager.remove_worker_from_mineral(worker.tag)
                 worker.build_gas(vg)
                 break
+
+    def _calculate_supply_placements(self) -> None:
+        """
+        Depots placements around the edge of the main base to make room for everything else
+        TODO: Current status -> Good enough
+            But try to get depot placements all round the edge
+        """
+        region: Region = self.map_data.in_region_p(self.ai.start_location)
+        # reposition these points slightly inwards
+        potential_depot_positions: Set[Point2] = {
+            p.towards(region.center, 2.0).rounded
+            for p in region.perimeter_points
+            if self.ai.in_placement_grid(p.towards(region.center, 2.0).rounded)
+            and p.distance_to(self.ai.main_base_ramp.top_center) > 5.5
+        }
+
+        placement_grid = self.ai.game_info.placement_grid.data_numpy.copy()
+        depot_positions = []
+        for pos in potential_depot_positions:
+            valid, placement_grid = self.ai.valid_two_by_two_position(
+                pos, placement_grid
+            )
+            if valid:
+                depot_positions.append(pos)
+
+        depot_positions = sorted(
+            depot_positions, key=lambda x: x.distance_to(self.ai.start_location)
+        )
+        self.depot_positions.extend(depot_positions)

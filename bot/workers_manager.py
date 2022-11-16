@@ -27,6 +27,7 @@ class WorkersManager:
         "enemy_committed_worker_rush",
         "worker_defence_tags",
         "long_distance_mfs",
+        "locked_action_tags",
     )
 
     def __init__(self, ai: BotAI, unit_roles: UnitRoles) -> None:
@@ -47,6 +48,7 @@ class WorkersManager:
         self.enemy_committed_worker_rush: bool = False
         self.worker_defence_tags: Set = set()
         self.long_distance_mfs: Units = Units([], self.ai)
+        self.locked_action_tags: Dict[int, float] = dict()
 
     @property
     def available_minerals(self) -> Units:
@@ -235,12 +237,13 @@ class WorkersManager:
         _minerals: Units = available_minerals
 
         for worker in workers:
+            tag: int = worker.tag
             # run out of minerals to assign
             if not _minerals:
                 return
             if (
-                worker.tag in self.worker_to_mineral_patch_dict
-                or worker.tag in self.worker_to_geyser_dict
+                tag in self.worker_to_mineral_patch_dict
+                or tag in self.worker_to_geyser_dict
             ):
                 continue
 
@@ -281,6 +284,11 @@ class WorkersManager:
         }
         for worker in workers:
             worker_tag: int = worker.tag
+            if worker_tag in self.locked_action_tags:
+                if self.ai.time > self.locked_action_tags[worker_tag] + 0.4:
+                    self.locked_action_tags.pop(worker_tag)
+                continue
+
             if worker_tag in self.worker_to_mineral_patch_dict:
                 mineral_tag: int = self.worker_to_mineral_patch_dict[worker_tag]
                 mineral: Optional[Unit] = minerals.get(mineral_tag, None)
@@ -294,6 +302,7 @@ class WorkersManager:
                     and worker.order_target != mineral.tag
                 ):
                     worker.gather(mineral)
+                    self.locked_action_tags[worker_tag] = self.ai.time
                     # to reduce apm only click one scv on to their patch per iteration
                     # let in-game engine sort things out inbetween
                     break

@@ -1,5 +1,6 @@
 from typing import Union, List, Set, Tuple, Optional, Dict
 
+import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.spatial import KDTree
 
@@ -122,3 +123,50 @@ class BotAIExt(BotAI):
                     ]
                 )
             )
+
+    @staticmethod
+    def valid_two_by_two_position(
+        position: Point2, placement_grid: np.ndarray
+    ) -> Tuple[bool, np.ndarray]:
+        """
+        Have a possible building pos, see if it can go there
+        :param position:
+        :param placement_grid:
+        :return:is valid bool, updated placement grid
+        """
+        points_to_check: List[List[int]] = [[0, 0] for _ in range(4)]
+        # (x, y)
+        points_to_check[0][0] = position[0]
+        points_to_check[0][1] = position[1]
+        # (x - 1, y)
+        points_to_check[1][0] = position[0] - 1
+        points_to_check[1][1] = position[1]
+        # (x, y - 1)
+        points_to_check[2][0] = position[0]
+        points_to_check[2][1] = position[1] - 1
+        # (x - 1, y - 1)
+        points_to_check[3][0] = position[0] - 1
+        points_to_check[3][1] = position[1] - 1
+
+        valid: bool = True
+        for point in points_to_check:
+            x = point[0]
+            y = point[1]
+            if (
+                x >= placement_grid.shape[0]
+                or x < 0
+                or y >= placement_grid.shape[1]
+                or y < 0
+            ):
+                return False, placement_grid
+
+            if placement_grid[point[0]][point[1]] == 0:
+                valid = False
+                break
+
+        if valid:
+            # update our copy of placement grid
+            for point in points_to_check:
+                placement_grid[point[0]][point[1]] = 0
+
+        return valid, placement_grid

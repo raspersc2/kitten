@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict
 
+from sc2.position import Point2, Point3
 from scipy.spatial import KDTree
 
 from bot.botai_ext import BotAIExt
@@ -40,6 +41,7 @@ class Kitten(BotAIExt):
         # initiate in `on_start`
         self.map_data: Optional[MapData] = None
         self.pathing: Optional[Pathing] = None
+        self.macro: Optional[Macro] = None
 
         self.config: Dict = dict()
         self.CONFIG_FILE = "config.yaml"
@@ -51,12 +53,14 @@ class Kitten(BotAIExt):
         self.unit_roles: UnitRoles = UnitRoles(self)
         self.unit_squads: UnitSquads = UnitSquads(self, self.unit_roles, self.agent)
         self.workers_manager: WorkersManager = WorkersManager(self, self.unit_roles)
-        self.macro: Macro = Macro(self, self.unit_roles, self.workers_manager)
 
     async def on_start(self) -> None:
         self.map_data = MapData(self)
         self.pathing = Pathing(self, self.map_data)
-        self.client.game_step = 2
+        self.macro: Macro = Macro(
+            self, self.unit_roles, self.workers_manager, self.map_data, self.debug
+        )
+        self.client.game_step = 16
         self.client.raw_affects_selection = True
         self.agent.get_episode_data()
         for worker in self.units(UnitTypeId.SCV):
@@ -77,6 +81,10 @@ class Kitten(BotAIExt):
         # reasonable assumption the pathing module does not need updating early on
         # if self.time > 60.0:
         self.pathing.update(iteration)
+
+        if self.debug:
+            for unit in self.all_units:
+                self.client.debug_text_world(f"{unit.tag}", unit, size=9)
 
     async def on_unit_created(self, unit: Unit) -> None:
         self.unit_roles.catch_unit(unit)
