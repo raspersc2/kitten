@@ -6,6 +6,11 @@ from sc2.ids.unit_typeid import UnitTypeId
 from sc2.position import Point2
 from sc2.units import Units
 
+"""
+Used to store things we require more then once
+To save iterations retrieving them again
+"""
+
 
 @dataclass
 class State:
@@ -15,7 +20,9 @@ class State:
     natural_build_area: Optional[Point2] = None
     ccs: Optional[Units] = None
     depots: Optional[Units] = None
+    factories: Optional[Units] = None
     orbitals: Optional[Units] = None
+    starports: Optional[Units] = None
 
     def __post_init__(self):
         self.barracks = self.ai.structures(UnitTypeId.BARRACKS)
@@ -23,6 +30,10 @@ class State:
         self.ccs = self.ai.townhalls(UnitTypeId.COMMANDCENTER)
         self.depots = self.ai.structures(UnitTypeId.SUPPLYDEPOT)
         self.orbitals = self.ai.townhalls(UnitTypeId.ORBITALCOMMAND)
+        self.factories = self.ai.structures(
+            {UnitTypeId.FACTORY, UnitTypeId.FACTORYFLYING}
+        )
+        self.starports = self.ai.structures(UnitTypeId.STARPORT)
 
         self.natural_build_area: Point2 = self.ai.townhalls.furthest_to(
             self.ai.start_location

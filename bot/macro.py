@@ -16,7 +16,7 @@ from bot.workers_manager import WorkersManager
 from sc2.bot_ai import BotAI
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
-from sc2.position import Point2, Point3
+from sc2.position import Point2, Point3, Pointlike
 from sc2.unit import Unit
 from sc2.units import Units
 
@@ -76,9 +76,11 @@ class Macro:
         self._build_refineries(available_scvs)
         await self._build_supply(iteration, available_scvs)
         self._produce_workers()
-        self._build_addons()
+        await self._build_addons()
         self._produce_army()
         await self._build_barracks(available_scvs)
+        await self._build_factory(available_scvs)
+        await self._build_starport(available_scvs)
 
         # 2 townhalls at all times
         if (
@@ -108,17 +110,25 @@ class Macro:
                 self.ai.client.debug_box2_out(pos)
 
     def _produce_army(self) -> None:
-        barracks: Units = self.state.barracks.idle
-        if not barracks or not self.ai.can_afford(UnitTypeId.MARINE):
+        if not self.ai.can_afford(UnitTypeId.MARINE) or self.ai.supply_left <= 0:
             return
+        barracks: Units = self.state.barracks.filter(lambda u: u.is_ready and u.is_idle)
+        ports: Units = self.state.starports.filter(lambda u: u.is_ready and u.is_idle)
 
         for rax in barracks:
-            if rax.is_idle:
-                if rax.has_techlab:
-                    if self.ai.can_afford(UnitTypeId.MARAUDER):
-                        rax(AbilityId.BARRACKSTRAIN_MARAUDER)
-                    continue
-                rax(AbilityId.BARRACKSTRAIN_MARINE)
+            if self.ai.supply_left <= 0:
+                break
+            if rax.has_techlab:
+                if self.ai.can_afford(UnitTypeId.MARAUDER):
+                    self.ai.train(UnitTypeId.MARAUDER)
+                continue
+            self.ai.train(UnitTypeId.MARINE)
+
+        for _ in ports:
+            if self.ai.supply_left <= 0:
+                break
+            if self.ai.can_afford(UnitTypeId.MEDIVAC):
+                self.ai.train(UnitTypeId.MEDIVAC)
 
     def _produce_workers(self) -> None:
         if (
@@ -149,6 +159,7 @@ class Macro:
         if (
             self.ai.supply_used < 14
             or self.ai.supply_left >= 5
+            or self.ai.supply_cap >= 200
             or self.ai.already_pending(UnitTypeId.SUPPLYDEPOT) >= max_building
             or not self.ai.can_afford(UnitTypeId.SUPPLYDEPOT)
             or not available_scvs
@@ -177,37 +188,18 @@ class Macro:
                 UnitTypeId.SUPPLYDEPOT, self.state.natural_build_area, available_scvs
             )
 
-    def _build_addons(self) -> None:
-        def barracks_points_to_build_addon(sp_position: Point2) -> List[Point2]:
-            """Return all points that need to be checked when trying to build an addon. Returns 4 points."""
-            addon_offset: Point2 = Point2((2.5, -0.5))
-            addon_position: Point2 = sp_position + addon_offset
-            addon_points = [
-                (addon_position + Point2((x - 0.5, y - 0.5))).rounded
-                for x in range(0, 2)
-                for y in range(0, 2)
-            ]
-            return addon_points
-
-        rax: Units = self.state.barracks
-
+    async def _build_addons(self) -> None:
         add_ons: Units = self.ai.structures(UnitTypeId.BARRACKSTECHLAB)
-        if len(add_ons) < 3 and self.ai.can_afford(UnitTypeId.TECHLAB) and rax.idle:
+        if len(add_ons) < 2 and self.ai.can_afford(UnitTypeId.TECHLAB):
+            rax: Units = self.state.barracks.filter(lambda u: u.is_ready and u.is_idle)
             for b in rax:
                 if not b.has_add_on:
-                    addon_points: List[Point2] = barracks_points_to_build_addon(
-                        b.position
-                    )
-                    if all(
-                        self.ai.in_map_bounds(addon_point)
-                        and self.ai.in_placement_grid(addon_point)
-                        and self.ai.in_pathing_grid(addon_point)
-                        for addon_point in addon_points
-                    ):
+                    add_on_location: Pointlike = b.position.offset(Point2((2.5, -0.5)))
+                    if await self.ai.can_place(UnitTypeId.SUPPLYDEPOT, add_on_location):
                         b.build(UnitTypeId.BARRACKSTECHLAB)
 
     async def _build_barracks(self, available_scvs: Units) -> None:
-        max_barracks: int = 3 if len(self.ai.townhalls) <= 1 else 8
+        max_barracks: int = 2 if len(self.ai.townhalls) <= 1 else 8
         rax: Units = self.state.barracks
         if (
             self.ai.tech_requirement_progress(UnitTypeId.BARRACKS) != 1
@@ -217,9 +209,13 @@ class Macro:
         ):
             return
 
-        await self._build_structure(
-            UnitTypeId.BARRACKS, self.state.main_build_area, available_scvs
+        build_area: Point2 = (
+            self.state.main_build_area
+            if len(rax) < 5
+            else self.state.natural_build_area
         )
+
+        await self._build_structure(UnitTypeId.BARRACKS, build_area, available_scvs)
 
     def _manage_upgrades(self):
         ccs: Units = self.state.ccs
@@ -313,15 +309,47 @@ class Macro:
         }
 
         placement_grid = self.ai.game_info.placement_grid.data_numpy.copy()
-        depot_positions = []
         for pos in potential_depot_positions:
             valid, placement_grid = self.ai.valid_two_by_two_position(
                 pos, placement_grid
             )
             if valid:
-                depot_positions.append(pos)
+                self.depot_positions.append(pos)
 
-        depot_positions = sorted(
-            depot_positions, key=lambda x: x.distance_to(self.ai.start_location)
+        self.depot_positions = sorted(
+            self.depot_positions, key=lambda x: x.distance_to(self.ai.start_location)
         )
-        self.depot_positions.extend(depot_positions)
+
+    async def _build_factory(self, available_scvs: Units) -> None:
+        factories: Units = self.state.factories
+        if f := factories.not_flying:
+            f[0](AbilityId.LIFT_FACTORY)
+            self.unit_roles.assign_role(f[0].tag, UnitRoleTypes.ATTACKING)
+
+        if (
+            self.ai.tech_requirement_progress(UnitTypeId.FACTORY) != 1
+            or len(factories) >= 1
+            or not available_scvs
+            or not self.ai.can_afford(UnitTypeId.FACTORY)
+            or self.ai.already_pending(UnitTypeId.FACTORY)
+        ):
+            return
+
+        await self._build_structure(
+            UnitTypeId.FACTORY, self.state.main_build_area, available_scvs
+        )
+
+    async def _build_starport(self, available_scvs: Units) -> None:
+        ports: Units = self.state.starports
+        if (
+            self.ai.tech_requirement_progress(UnitTypeId.STARPORT) != 1
+            or len(ports) >= 1
+            or not available_scvs
+            or not self.ai.can_afford(UnitTypeId.STARPORT)
+            or self.ai.already_pending(UnitTypeId.STARPORT)
+        ):
+            return
+
+        await self._build_structure(
+            UnitTypeId.STARPORT, self.state.main_build_area, available_scvs
+        )

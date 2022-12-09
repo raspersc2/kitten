@@ -328,7 +328,10 @@ class WorkersManager:
                             )
                         )
                         calculated_long_distance_mfs = True
-                    worker.gather(self.long_distance_mfs.closest_to(worker))
+                    if len(self.ai.townhalls) <= 1:
+                        worker.gather(self.ai.mineral_field.closest_to(worker))
+                    else:
+                        worker.gather(self.long_distance_mfs.closest_to(worker))
 
     def remove_worker_from_mineral(self, worker_tag: int) -> None:
         """
