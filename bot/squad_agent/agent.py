@@ -11,7 +11,7 @@ from bot.botai_ext import BotAIExt
 from bot.squad_agent.features import Features
 
 
-class PPOAgent(BaseAgent):
+class Agent(BaseAgent):
     def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing):
         super().__init__(ai, config)
         self.features: Features = Features(ai, 256, self.device)

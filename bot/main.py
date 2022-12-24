@@ -18,7 +18,7 @@ from bot.unit_squads import UnitSquads
 from bot.workers_manager import WorkersManager
 
 # from bot.squad_agent.random_agent import RandomAgent
-from bot.squad_agent.ppo_agent import PPOAgent
+from bot.squad_agent.agent import Agent
 from MapAnalyzer.MapData import MapData
 
 
@@ -58,7 +58,7 @@ class Kitten(BotAIExt):
     async def on_start(self) -> None:
         self.map_data = MapData(self)
         self.pathing = Pathing(self, self.map_data)
-        self.agent = PPOAgent(self, self.config, self.pathing)
+        self.agent = Agent(self, self.config, self.pathing)
         self.macro: Macro = Macro(
             self, self.unit_roles, self.workers_manager, self.map_data, self.debug
         )
