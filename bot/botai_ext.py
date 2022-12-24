@@ -1,14 +1,15 @@
 from typing import Union, List, Set, Tuple, Optional, Dict
 
 import numpy as np
-from scipy.spatial.distance import cdist
 from scipy.spatial import KDTree
 
+from bot.consts import ALL_STRUCTURES
 from sc2.units import Units
 
 from sc2.position import Point2
 
 from sc2.ids.ability_id import AbilityId
+from sc2.ids.unit_typeid import UnitTypeId
 
 from sc2.bot_ai import BotAI
 from s2clientprotocol import raw_pb2 as raw_pb
@@ -170,3 +171,18 @@ class BotAIExt(BotAI):
                 placement_grid[point[0]][point[1]] = 0
 
         return valid, placement_grid
+
+    def get_total_supply(self, units: Units) -> int:
+        """
+        Get total supply of units.
+        @param units:
+        @return:
+        """
+        return sum(
+            [
+                UNIT_DATA[unit.type_id]["supply"]
+                for unit in units
+                # yes we did have a crash getting supply of a nuke!
+                if unit.type_id not in ALL_STRUCTURES and unit.type_id != UnitTypeId.NUKE
+            ]
+        )
