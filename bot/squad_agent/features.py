@@ -1,340 +1,17 @@
-import enum
 from typing import List, Tuple
 
 import numpy as np
 import torch
-from torch import uint8, int16, float16, float32
 from torch.nn.functional import one_hot
 
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
 
 from bot.botai_ext import BotAIExt
+from bot.consts import ConfigSettings, BUFF_TYPES, UNIT_TYPES
 
-UNIT_TYPES = [
-    0,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    16,
-    17,
-    18,
-    19,
-    20,
-    21,
-    22,
-    23,
-    24,
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    31,
-    32,
-    33,
-    34,
-    35,
-    36,
-    37,
-    38,
-    39,
-    40,
-    41,
-    42,
-    43,
-    44,
-    45,
-    46,
-    47,
-    48,
-    49,
-    50,
-    51,
-    52,
-    53,
-    54,
-    55,
-    56,
-    57,
-    58,
-    59,
-    60,
-    61,
-    62,
-    63,
-    64,
-    65,
-    66,
-    67,
-    68,
-    69,
-    70,
-    71,
-    72,
-    73,
-    74,
-    75,
-    76,
-    77,
-    78,
-    79,
-    80,
-    81,
-    82,
-    83,
-    84,
-    85,
-    86,
-    87,
-    88,
-    89,
-    90,
-    91,
-    92,
-    93,
-    94,
-    95,
-    96,
-    97,
-    98,
-    99,
-    100,
-    101,
-    102,
-    103,
-    104,
-    105,
-    106,
-    107,
-    108,
-    109,
-    110,
-    111,
-    112,
-    113,
-    114,
-    115,
-    116,
-    117,
-    118,
-    119,
-    120,
-    125,
-    126,
-    127,
-    128,
-    129,
-    130,
-    131,
-    132,
-    133,
-    134,
-    135,
-    136,
-    137,
-    138,
-    139,
-    140,
-    141,
-    142,
-    143,
-    144,
-    145,
-    146,
-    147,
-    149,
-    150,
-    151,
-    268,
-    289,
-    311,
-    321,
-    322,
-    324,
-    330,
-    335,
-    336,
-    341,
-    342,
-    343,
-    344,
-    350,
-    364,
-    365,
-    371,
-    372,
-    373,
-    376,
-    377,
-    472,
-    473,
-    474,
-    475,
-    483,
-    484,
-    485,
-    486,
-    487,
-    488,
-    489,
-    490,
-    493,
-    494,
-    495,
-    496,
-    498,
-    499,
-    500,
-    501,
-    502,
-    503,
-    504,
-    517,
-    518,
-    559,
-    560,
-    561,
-    562,
-    563,
-    564,
-    588,
-    589,
-    590,
-    591,
-    608,
-    609,
-    610,
-    612,
-    628,
-    629,
-    630,
-    638,
-    639,
-    640,
-    641,
-    642,
-    643,
-    648,
-    649,
-    651,
-    661,
-    662,
-    663,
-    664,
-    665,
-    666,
-    687,
-    688,
-    689,
-    690,
-    691,
-    692,
-    693,
-    694,
-    732,
-    733,
-    734,
-    796,
-    797,
-    801,
-    824,
-    830,
-    877,
-    880,
-    881,
-    884,
-    885,
-    886,
-    887,
-    892,
-    893,
-    894,
-    1904,
-    1908,
-    1910,
-    1911,
-    1912,
-    1913,
-    1955,
-    1956,
-    1957,
-    1958,
-    1960,
-    1961,
-    1995,
-]
-
-BUFF_TYPES = [
-    0,
-    5,
-    6,
-    7,
-    8,
-    11,
-    12,
-    13,
-    16,
-    17,
-    18,
-    22,
-    24,
-    25,
-    27,
-    28,
-    29,
-    30,
-    33,
-    36,
-    38,
-    49,
-    59,
-    83,
-    89,
-    99,
-    102,
-    116,
-    121,
-    122,
-    129,
-    132,
-    133,
-    134,
-    136,
-    137,
-    145,
-    271,
-    272,
-    273,
-    274,
-    275,
-    277,
-    279,
-    280,
-    281,
-    288,
-    289,
-    20,
-    97,
-    303,
-    304,
-    306,
-    300,
-    293,
-]
-
-# since we one hot encode unit type ids we don't want to hot encode 1961 different values
-# so convert all unit type ids into our own index
+# since we one hot encode unit type ids we don't want to hot encode 1961+ different values
+# so convert all unit type ids into our own index from consts
 BUFF_TYPE_DICT = dict(zip(BUFF_TYPES, range(0, len(BUFF_TYPES))))
 UNIT_TYPE_DICT = dict(zip(UNIT_TYPES, range(0, len(UNIT_TYPES))))
 
@@ -351,115 +28,25 @@ NUM_BUFF_TYPES: int = len(BUFF_TYPES)
 NUM_UPGRADES: int = len(UpgradeId)
 
 
-class FeatureType(enum.Enum):
-    SCALAR = 1
-    CATEGORICAL = 2
-
-
-class ScoreCategories(enum.IntEnum):
-    """Indices for the `score_by_category` observation's second dimension."""
-
-    none = 0
-    army = 1
-    economy = 2
-    technology = 3
-    upgrade = 4
-
-
-class FeatureUnit(enum.IntEnum):
-    """Indices for the `feature_unit` observations."""
-
-    unit_type = 0
-    alliance = 1
-    health_max = 2
-    shield_max = 3
-    energy_max = 4
-    x = 5
-    y = 6
-    cloak = 7
-    is_blip = 8
-    is_powered = 9
-    weapon_cooldown = 10
-    is_hallucination = 11
-    buff_id_0 = 12
-    buff_id_1 = 13
-    is_active = 14
-    attack_upgrade_level = 15
-    armor_upgrade_level = 16
-    shield_upgrade_level = 17
-
-
-ENTITY_INFO = [
-    ("unit_type", int16),
-    ("alliance", uint8),
-    ("health_ratio", float16),
-    ("shield_ratio", float16),
-    ("energy_ratio", float16),
-    ("x", uint8),
-    ("y", uint8),
-    ("cloak", uint8),
-    ("is_blip", uint8),
-    ("is_powered", uint8),
-    ("weapon_cooldown", uint8),
-    ("is_hallucination", uint8),
-    ("buff_id_0", uint8),
-    ("buff_id_1", uint8),
-    ("is_active", uint8),
-    ("attack_upgrade_level", uint8),
-    ("armor_upgrade_level", uint8),
-    ("shield_upgrade_level", uint8),
-]
-
-# (name, dtype, size)
-SCALAR_INFO = [
-    ("home_race", uint8, ()),
-    ("away_race", uint8, ()),
-    ("upgrades", int16, (NUM_UPGRADES,)),
-    ("time", float32, ()),
-    ("unit_counts_bow", uint8, (NUM_UNIT_TYPES,)),
-    ("agent_statistics", float32, (10,)),
-    ("beginning_order", int16, (BEGINNING_ORDER_LENGTH,)),
-    ("last_queued", int16, ()),
-    ("last_delay", int16, ()),
-    ("last_action_type", int16, ()),
-    ("bo_location", int16, (BEGINNING_ORDER_LENGTH,)),
-    ("unit_type_bool", uint8, (NUM_UNIT_TYPES,)),
-    ("enemy_unit_type_bool", uint8, (NUM_UNIT_TYPES,)),
-]
-
-SPATIAL_INFO = [
-    ("height_map", uint8),
-    ("visibility_map", uint8),
-    ("creep", uint8),
-    ("player_relative", uint8),
-    ("pathable", uint8),
-]
-
-
-def compute_battle_score(obs, enemy=False):
-    if obs is None:
-        return 0.0
-    score_details = obs.observation.score.score_details
-    killed_mineral, killed_vespene = 0.0, 0.0
-    for s in ScoreCategories:
-        if not enemy:
-            killed_mineral += getattr(score_details.killed_minerals, s.name)
-            killed_vespene += getattr(score_details.killed_vespene, s.name)
-        else:
-            killed_mineral += getattr(score_details.lost_minerals, s.name)
-            killed_vespene += getattr(score_details.lost_vespene, s.name)
-    battle_score = killed_mineral + 1.5 * killed_vespene
-    return battle_score
-
-
 class Features:
-    def __init__(self, ai: BotAIExt, max_entities: int, device) -> None:
+    def __init__(self, ai: BotAIExt, config: dict, max_entities: int, device) -> None:
         self.ai: BotAIExt = ai
         self.units: List = []
         self.tags: List[int] = []
         self.max_entities: int = max_entities
         self.device = device
         self.map_size_y = self.ai.game_info.map_size.y
+        self.visualize_spatial_features: bool = config[
+            ConfigSettings.VISUALIZE_SPATIAL_FEATURES
+        ]
+
+        self.fig = None
+        if self.visualize_spatial_features:
+            import matplotlib.pyplot as plt
+            import matplotlib
+
+            matplotlib.use("TkAgg")
+            self.fig = plt.figure(figsize=(10, 7))
 
     def reset(self) -> None:
         self.units = []
@@ -505,6 +92,9 @@ class Features:
 
         entity, entities_type, locations = self._process_entity_info()
         spatial = self._process_spatial_info(ground_grid)
+        if self.visualize_spatial_features:
+            self._plot_spatial_features(spatial)
+
         # TODO
         # scalar: torch.Tensor = self._process_scalar_info(obs, pos_of_squad)
 
@@ -656,3 +246,47 @@ class Features:
         spatial_arr = torch.cat(spatial_arr)
 
         return spatial_arr
+
+    def _plot_spatial_features(self, spatial: torch.Tensor) -> None:
+        import matplotlib.pyplot as plt
+        from IPython.display import clear_output
+
+        rows: int = 3
+        cols: int = 2
+
+        plt.clf()
+
+        self.fig.add_subplot(rows, cols, 1)
+        # showing image
+        plt.imshow(spatial[0].rot90())
+        plt.axis("off")
+        plt.title("Enemy influence")
+
+        # Adds a subplot at the 2nd position
+        self.fig.add_subplot(rows, cols, 2)
+
+        # showing image
+        plt.imshow(spatial[1].rot90())
+        plt.axis("off")
+        plt.title("Height")
+
+        # Adds a subplot at the 3rd position
+        self.fig.add_subplot(rows, cols, 3)
+
+        # showing image
+        plt.imshow(spatial[2].rot90())
+        plt.axis("off")
+        plt.title("Creep")
+
+        # note creep is one hot encoded, so spatial [3] is creep too
+
+        # Adds a subplot at the 4th position
+        self.fig.add_subplot(rows, cols, 4)
+
+        plt.imshow(spatial[4].rot90())
+        plt.axis("off")
+        plt.title("visibility")
+
+        self.fig.canvas.draw()
+        plt.pause(0.00000001)
+        clear_output(wait=True)

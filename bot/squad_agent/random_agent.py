@@ -11,7 +11,7 @@ from sc2.units import Units
 
 
 class RandomAgent(BaseAgent):
-    def __init__(self, ai: BotAI, config: Dict):
+    def __init__(self, ai: BotAI, config: Dict, pathing):
         super().__init__(ai, config)
 
     def choose_action(

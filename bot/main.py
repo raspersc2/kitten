@@ -10,14 +10,14 @@ from sc2.ids.unit_typeid import UnitTypeId
 from sc2.unit import Unit
 import yaml
 
-from bot.consts import DebugSettings
+from bot.consts import ConfigSettings
 from bot.macro import Macro
 from bot.state import State
 from bot.unit_roles import UnitRoles
 from bot.unit_squads import UnitSquads
 from bot.workers_manager import WorkersManager
 
-# from bot.squad_agent.random_agent import RandomAgent
+from bot.squad_agent.random_agent import RandomAgent
 from bot.squad_agent.agent import Agent
 from MapAnalyzer.MapData import MapData
 
@@ -49,7 +49,7 @@ class Kitten(BotAIExt):
         self.CONFIG_FILE = "config.yaml"
         with open(f"{self.CONFIG_FILE}", "r") as config_file:
             self.config = yaml.safe_load(config_file)
-        self.debug: bool = self.config[DebugSettings.DEBUG]
+        self.debug: bool = self.config[ConfigSettings.DEBUG]
 
         self.unit_roles: UnitRoles = UnitRoles(self)
 
