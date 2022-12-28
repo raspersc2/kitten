@@ -14,7 +14,7 @@ from bot.squad_agent.features import Features
 class Agent(BaseAgent):
     def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing):
         super().__init__(ai, config)
-        self.features: Features = Features(ai, 256, self.device)
+        self.features: Features = Features(ai, config, 256, self.device)
         self.pathing: Pathing = pathing
 
     def choose_action(
