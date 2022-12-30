@@ -3,11 +3,15 @@ from typing import Set, Dict
 
 from sc2.ids.unit_typeid import UnitTypeId
 
-DATA_DIR: str = "./data"
-
 
 class ConfigSettings(str, Enum):
+    DATA_DIRECTORY = "DataDirectory"
     DEBUG = "Debug"
+    CHECKPOINT_NAME = "CheckPointName"
+    GAME_STEP = "GameStep"
+    INFERENCE_MODE = "InferenceMode"
+    STATE_DIRECTORY = "StateDirectory"
+    SQUAD_AGENT = "SquadAgent"
     VISUALIZE_SPATIAL_FEATURES = "VisualizeSpatialFeatures"
 
 
@@ -20,6 +24,7 @@ class SquadActionType(Enum):
     MOVE_TO_SAFE_SPOT = auto()
     HOLD_POSITION = auto()
     RETREAT_TO_RALLY_POINT = auto()
+    STIM = auto()
 
 
 SQUAD_ACTIONS: Dict[int, SquadActionType] = {
@@ -28,6 +33,7 @@ SQUAD_ACTIONS: Dict[int, SquadActionType] = {
     2: SquadActionType.MOVE_TO_MAIN_OFFENSIVE_THREAT,
     3: SquadActionType.RETREAT_TO_RALLY_POINT,
     4: SquadActionType.HOLD_POSITION,
+    5: SquadActionType.STIM,
 }
 
 

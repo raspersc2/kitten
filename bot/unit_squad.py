@@ -1,5 +1,7 @@
 from typing import Set, Union, Optional, Dict
 
+from sc2.ids.upgrade_id import UpgradeId
+
 from bot.pathing import Pathing
 from sc2.unit import Unit
 
@@ -20,6 +22,7 @@ class UnitSquad:
         "stutter_forward",
         "stuttering",
         "action_updated_this_step",
+        "stim_next_step",
     )
 
     def __init__(self, ai: BotAIExt, squad_id: str, squad_units: Units):
@@ -36,6 +39,10 @@ class UnitSquad:
         self.stuttering: bool = False
 
         self.action_updated_this_step: bool = False
+        self.stim_next_step: bool = False
+
+    def set_stim_status(self, status: bool) -> None:
+        self.stim_next_step = status
 
     def set_squad_units(self, units: Units) -> None:
         self.squad_units = units
@@ -52,25 +59,28 @@ class UnitSquad:
     async def do_action(
         self, squad_tags: Set[int], pathing: Pathing, main_squad: bool = False
     ) -> None:
-        # currently only main squad uses RL agent, all other squads have some scripted logic
+        # currently only main squad uses RL agent, all other squads have scripted logic
         if not main_squad:
             await self._do_scripted_squad_action(squad_tags)
         else:
-
-            if self.current_action == AbilityId.HOLDPOSITION:
-                perform_action: bool = False
-                for unit in self.squad_units:
-                    if not unit.is_using_ability(AbilityId.HOLDPOSITION):
-                        perform_action = True
-                        break
-                if perform_action:
-                    await self.ai.give_units_same_order(
-                        AbilityId.HOLDPOSITION, squad_tags
-                    )
-            elif self.current_action == AbilityId.ATTACK:
-                await self._do_squad_attack_action(squad_tags, pathing)
+            if self.stim_next_step and UpgradeId.STIMPACK in self.ai.state.upgrades:
+                self.stim_next_step = False
+                await self.ai.give_units_same_order(AbilityId.EFFECT_STIM, squad_tags)
             else:
-                await self._do_squad_move_action(squad_tags, pathing)
+                if self.current_action == AbilityId.HOLDPOSITION:
+                    perform_action: bool = False
+                    for unit in self.squad_units:
+                        if not unit.is_using_ability(AbilityId.HOLDPOSITION):
+                            perform_action = True
+                            break
+                    if perform_action:
+                        await self.ai.give_units_same_order(
+                            AbilityId.HOLDPOSITION, squad_tags
+                        )
+                elif self.current_action == AbilityId.ATTACK:
+                    await self._do_squad_attack_action(squad_tags, pathing)
+                else:
+                    await self._do_squad_move_action(squad_tags, pathing)
 
     async def _do_scripted_squad_action(self, squad_tags: Set[int]) -> None:
         """

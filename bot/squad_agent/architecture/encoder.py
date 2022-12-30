@@ -28,27 +28,24 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class Encoder(nn.Module):
-    def __init__(self, device, ai, mediator):
+    def __init__(self, device, ai, grid: np.ndarray):
         super(Encoder, self).__init__()
         self.device = device
         self.ai = ai
-        self.mediator = mediator
         self.cropped_cols: Optional[np.ndarray] = None
         self.cropped_rows: Optional[np.ndarray] = None
         self.entity_encoder = EntityEncoder(device)
         self.spatial_encoder = SpatialEncoder()
         self.spatial_encoder.to(memory_format=channels_last)
 
-        self.scalar_fc1 = layer_init(nn.Linear(10, 32))
+        self.scalar_fc1 = layer_init(nn.Linear(8, 32))
         self.scalar_fc2 = layer_init(nn.Linear(32, 4))
         self.first_iteration: bool = True
+        self._get_cropped_cols_and_rows(grid)
 
     def forward(
         self, spatial, entity, scalar, locations, process: bool = True
     ) -> Tuple[Tensor, Tensor]:
-        if self.first_iteration:
-            self._get_cropped_cols_and_rows()
-            self.first_iteration = False
         entities_scatter, embedded_entity = self.entity_encoder(entity)
         if process:
             scatter_entity = self._scatter_connection(entities_scatter, locations)
@@ -125,13 +122,15 @@ class Encoder(nn.Module):
         scatter_map = resize(scatter_map, SPATIAL_SIZE)
         return scatter_map
 
-    def _get_cropped_cols_and_rows(self, threshold: float = 0.0) -> None:
+    def _get_cropped_cols_and_rows(
+        self, grid: np.ndarray, threshold: float = 0.0
+    ) -> None:
         """
         Crops any edges below or equal to threshold
         Returns cropped image.
         Only called once at start of game
         """
-        flatImage = self.mediator.get_cached_ground_grid.copy()
+        flatImage = grid
         # ma pads unpathable areas with infinite values, change them to 0
         flatImage = np.where(flatImage == np.inf, 0, flatImage)
         self.cropped_rows = np.where(np.max(flatImage, 0) > threshold)[0]

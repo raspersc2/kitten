@@ -1,2 +1,9 @@
+DataDirectory: "./data"
 Debug: True
-VisualizeSpatialFeatures: True
+GameStep: 4
+VisualizeSpatialFeatures: False
+SquadAgent:
+  CheckPointName: "checkpoint.pt"
+  InferenceMode: True
+  # Offline agent stores states, actions, rewards etc. here
+  StateDirectory: "states"

@@ -12,10 +12,10 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, action_space_size, device, ai, mediator):
+    def __init__(self, action_space_size: int, device, ai, grid: np.ndarray):
         super().__init__()
         self.ai = ai
-        self.shared_layers = Encoder(device, ai, mediator)
+        self.shared_layers = Encoder(device, ai, grid)
 
         self.lstm = nn.LSTM(292, 128)
         for name, param in self.lstm.named_parameters():
@@ -24,7 +24,7 @@ class ActorCritic(nn.Module):
             elif "weight" in name:
                 nn.init.orthogonal_(param, 1.0)
 
-        self.policy_layers = layer_init(nn.Linear(128, 10), std=0.01)
+        self.policy_layers = layer_init(nn.Linear(128, action_space_size), std=0.01)
         self.value_layers = layer_init(nn.Linear(128, 1), std=1)
 
     def get_states(

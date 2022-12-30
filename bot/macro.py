@@ -196,7 +196,7 @@ class Macro:
                 if not b.has_add_on:
                     add_on_location: Pointlike = b.position.offset(Point2((2.5, -0.5)))
                     if await self.ai.can_place(UnitTypeId.SUPPLYDEPOT, add_on_location):
-                        b.build(UnitTypeId.BARRACKSTECHLAB)
+                        b.build(UnitTypeId.STARPORTTECHLAB)
 
     async def _build_barracks(self, available_scvs: Units) -> None:
         max_barracks: int = 2 if len(self.ai.townhalls) <= 1 else 8

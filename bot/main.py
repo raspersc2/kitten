@@ -18,7 +18,7 @@ from bot.unit_squads import UnitSquads
 from bot.workers_manager import WorkersManager
 
 from bot.squad_agent.random_agent import RandomAgent
-from bot.squad_agent.agent import Agent
+from bot.squad_agent.offline_agent import OfflineAgent
 from MapAnalyzer.MapData import MapData
 
 
@@ -58,12 +58,12 @@ class Kitten(BotAIExt):
     async def on_start(self) -> None:
         self.map_data = MapData(self)
         self.pathing = Pathing(self, self.map_data)
-        self.agent = Agent(self, self.config, self.pathing)
+        self.agent = OfflineAgent(self, self.config, self.pathing)
         self.macro: Macro = Macro(
             self, self.unit_roles, self.workers_manager, self.map_data, self.debug
         )
         self.unit_squads: UnitSquads = UnitSquads(self, self.unit_roles, self.agent)
-        self.client.game_step = 16
+        self.client.game_step = self.config[ConfigSettings.GAME_STEP]
         self.client.raw_affects_selection = True
         self.agent.get_episode_data()
         for worker in self.units(UnitTypeId.SCV):
@@ -93,7 +93,7 @@ class Kitten(BotAIExt):
         self.unit_roles.catch_unit(unit)
 
     async def on_unit_destroyed(self, unit_tag: int) -> None:
-        # self.agent.on_unit_destroyed(unit_tag)
+        self.agent.on_unit_destroyed(unit_tag)
         self.unit_squads.remove_tag(unit_tag)
         self.pathing.remove_unit_tag(unit_tag)
 

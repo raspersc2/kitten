@@ -64,8 +64,7 @@ class SpatialEncoder(nn.Module):
     def __init__(self, dropout_prob: float = 0.5):
         super(SpatialEncoder, self).__init__()
 
-        # 17 images as input TODO: Don't hardcode this
-        self.ds_1 = ConvLayer(40, 64)
+        self.ds_1 = ConvLayer(37, 64)
         self.ds_2 = ConvLayer(64, 128)
         self.ds_3 = ConvLayer(128, 128)
 

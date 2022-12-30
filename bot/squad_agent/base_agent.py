@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sc2.bot_ai import BotAI
 
-from bot.consts import DATA_DIR, SQUAD_ACTIONS
+from bot.consts import SQUAD_ACTIONS, ConfigSettings
 from sc2.position import Point2
 from sc2.unit import Unit
 from sc2.units import Units
@@ -26,6 +26,7 @@ class BaseAgent(metaclass=ABCMeta):
     __slots__ = (
         "ai",
         "config",
+        "DATA_DIR",
         "device",
         "epoch",
         "current_action",
@@ -39,14 +40,18 @@ class BaseAgent(metaclass=ABCMeta):
         "ml_training_file_path",
         "CHECKPOINT_PATH",
         "num_actions",
+        "training_active",
     )
 
-    def __init__(self, ai: BotAI, config: Dict):
+    def __init__(self, ai: BotAI, config: Dict, device: str = "cuda"):
         super().__init__()
         self.ai: BotAI = ai
         self.config: Dict = config
+        self.DATA_DIR: str = config[ConfigSettings.DATA_DIRECTORY]
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if device == "cuda" and torch.cuda.is_available() else "cpu"
+        )
         logger.info(f"Using {self.device}")
 
         self.epoch: int = 0
@@ -55,7 +60,7 @@ class BaseAgent(metaclass=ABCMeta):
         self.cumulative_reward: float = 0.0
         self.squad_reward: float = 0.0
         self.ml_training_file_path: path = path.join(
-            DATA_DIR, "agent_training_history.json"
+            self.DATA_DIR, "agent_training_history.json"
         )
         self.all_episode_data: List[Dict] = []
         self.previous_close_enemy: Optional[Units] = None
@@ -65,7 +70,15 @@ class BaseAgent(metaclass=ABCMeta):
         self.action_distribution: List[int] = [0 for _ in range(len(SQUAD_ACTIONS))]
 
         self.num_actions: int = len(SQUAD_ACTIONS)
-        self.CHECKPOINT_PATH: path = path.join(DATA_DIR, "checkpoint.pt")
+
+        self.CHECKPOINT_PATH: path = path.join(
+            self.DATA_DIR,
+            config[ConfigSettings.SQUAD_AGENT][ConfigSettings.CHECKPOINT_NAME],
+        )
+        self.training_active: bool = not config[ConfigSettings.SQUAD_AGENT][
+            ConfigSettings.INFERENCE_MODE
+        ]
+        logger.info(f"Training active: {self.training_active}")
 
     @property
     def reward(self) -> float:
@@ -81,6 +94,8 @@ class BaseAgent(metaclass=ABCMeta):
         pos_of_squad: Point2,
         all_close_enemy: Units,
         squad_units: Units,
+        attack_target: Point2,
+        rally_point: Point2,
     ) -> int:
         self.previous_main_squad = squad_units
         self.previous_close_enemy = all_close_enemy
@@ -155,7 +170,7 @@ class BaseAgent(metaclass=ABCMeta):
         torch.save(state, f_path)
 
     def load_checkpoint(self, model, optimizer, device):
-        logger.info("loaded existing model")
+        logger.info(f"Loaded existing model: {self.CHECKPOINT_PATH}")
         checkpoint = torch.load(self.CHECKPOINT_PATH, map_location=torch.device(device))
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
