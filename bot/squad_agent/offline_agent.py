@@ -63,6 +63,9 @@ class OfflineAgent(BaseAgent):
             self.model, self.optimizer, self.epoch = self.load_checkpoint(
                 self.model, self.optimizer, self.device
             )
+        # nothing stored on disk yet, there should be something there for the training script later
+        else:
+            self.save_checkpoint(self.model, self.optimizer)
 
         self.model.train() if self.training_active else self.model.eval()
 
