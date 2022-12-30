@@ -40,6 +40,10 @@ class Features:
         self.visualize_spatial_features: bool = config[
             ConfigSettings.VISUALIZE_SPATIAL_FEATURES
         ]
+        # height map remains static, only process it once
+        height = self.ai.game_info.terrain_height.data_numpy.copy().T
+        height = height[None, :]
+        self.height: torch.Tensor = torch.from_numpy(height)
 
         self.fig = None
         if self.visualize_spatial_features:
@@ -222,10 +226,7 @@ class Features:
         ground_grid = torch.from_numpy(ground_grid)
         spatial_arr.append(ground_grid)
 
-        height = self.ai.game_info.terrain_height.data_numpy.T
-        height = height[None, :]
-        height = torch.from_numpy(height)
-        spatial_arr.append(height)
+        spatial_arr.append(self.height)
 
         creep = self.ai.state.creep.data_numpy.T
         creep = torch.from_numpy(creep)
@@ -235,7 +236,7 @@ class Features:
 
         visibility = self.ai.state.visibility.data_numpy.T
         visibility = visibility[None, :]
-        visibility = torch.from_numpy(visibility)
+        visibility = torch.tensor(visibility)
         spatial_arr.append(visibility)
 
         # location_grid[self.mediator.get_rally_point.rounded] = 0.25

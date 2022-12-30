@@ -35,9 +35,10 @@ class State:
         )
         self.starports = self.ai.structures(UnitTypeId.STARPORT)
 
-        self.natural_build_area: Point2 = self.ai.townhalls.furthest_to(
-            self.ai.start_location
-        ).position.towards(self.ai.game_info.map_center, 5.5)
+        if self.ai.townhalls:
+            self.natural_build_area: Point2 = self.ai.townhalls.furthest_to(
+                self.ai.start_location
+            ).position.towards(self.ai.game_info.map_center, 5.5)
 
         if len(self.barracks) < 5:
             self.main_build_area: Point2 = self.ai.start_location.towards(
