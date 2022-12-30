@@ -3,7 +3,7 @@ Create and manage unit squad bookkeeping.
 Note: squad actions are carried out in `unit_squad.py`
 """
 import uuid
-from typing import Set, Dict, Any, List, Optional
+from typing import Set, Dict, Any, List, Optional, Callable
 from loguru import logger
 from sc2.unit import Unit
 
@@ -105,6 +105,8 @@ class UnitSquads:
                         pos_of_largest_squad,
                         Units([], self.ai),
                         squad.squad_units,
+                        self.attack_target,
+                        self.rally_point,
                     )
                     logger.info(f"Chosen action: {SQUAD_ACTIONS[action]}")
                     action_type: SquadActionType = SQUAD_ACTIONS[action]
@@ -120,6 +122,8 @@ class UnitSquads:
                         squad.update_action(AbilityId.MOVE, self.rally_point)
                     elif action_type == SquadActionType.HOLD_POSITION:
                         squad.update_action(AbilityId.HOLDPOSITION, self.rally_point)
+                    elif action_type == SquadActionType.STIM:
+                        squad.set_stim_status(True)
             else:
                 squad.update_action(AbilityId.ATTACK, pos_of_largest_squad)
 

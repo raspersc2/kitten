@@ -2,6 +2,7 @@ from typing import List, Tuple
 
 import numpy as np
 import torch
+from sc2.position import Point2
 from torch.nn.functional import one_hot
 
 from sc2.ids.unit_typeid import UnitTypeId
@@ -82,8 +83,12 @@ class Features:
         )
 
     def transform_obs(
-        self, ground_grid: np.ndarray
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        self,
+        ground_grid: np.ndarray,
+        pos_of_squad: Point2,
+        attack_target: Point2,
+        rally_point: Point2,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         for unit in self.ai.state.observation_raw.units:
             alliance: int = unit.alliance
@@ -95,10 +100,11 @@ class Features:
         if self.visualize_spatial_features:
             self._plot_spatial_features(spatial)
 
-        # TODO
-        # scalar: torch.Tensor = self._process_scalar_info(obs, pos_of_squad)
+        scalar: torch.Tensor = self._process_scalar_info(
+            self.ai.state.observation, pos_of_squad, attack_target, rally_point
+        )
 
-        return spatial, entity, locations
+        return spatial, entity, scalar, locations
 
     @staticmethod
     def _np_one_hot(targets: np.ndarray, nb_classes: int) -> np.ndarray:
@@ -246,6 +252,32 @@ class Features:
         spatial_arr = torch.cat(spatial_arr)
 
         return spatial_arr
+
+    def _process_scalar_info(
+        self,
+        obs,
+        pos_of_squad: Point2,
+        attack_target: Point2,
+        rally_point: Point2,
+    ) -> torch.Tensor:
+        """
+        Basically any extra information that our agent may use
+        """
+        scalars = [
+            pos_of_squad.x,
+            pos_of_squad.y,
+            self.ai.structures.amount,
+            self.ai.enemy_structures.amount,
+            attack_target.x,
+            self.map_size_y - attack_target.y,
+            rally_point.x,
+            self.map_size_y - rally_point.y,
+        ]
+        scalars = np.array(scalars)
+        scalars = torch.from_numpy(scalars)
+        scalars = scalars.to(torch.float32)
+        scalars = torch.unsqueeze(scalars, 0)
+        return scalars
 
     def _plot_spatial_features(self, spatial: torch.Tensor) -> None:
         import matplotlib.pyplot as plt
