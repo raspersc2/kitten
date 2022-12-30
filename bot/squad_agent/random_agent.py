@@ -20,7 +20,17 @@ class RandomAgent(BaseAgent):
         pos_of_squad: Point2,
         all_close_enemy: Units,
         squad_units: Units,
+        attack_target: Point2,
+        rally_point: Point2,
     ) -> int:
+        super(RandomAgent, self).choose_action(
+            squads,
+            pos_of_squad,
+            all_close_enemy,
+            squad_units,
+            attack_target,
+            rally_point,
+        )
         self.cumulative_reward += self.reward
         self.squad_reward = 0.0
         action: int = randint(0, self.num_actions - 1)

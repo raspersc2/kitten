@@ -62,7 +62,7 @@ class BaseAgent(metaclass=ABCMeta):
         self.ml_training_file_path: path = path.join(
             self.DATA_DIR, "agent_training_history.json"
         )
-        self.all_episode_data: List[Dict] = []
+        self.all_episode_data: List[Dict] = self.get_episode_data()
         self.previous_close_enemy: Optional[Units] = None
         self.previous_main_squad: Optional[Units] = None
 

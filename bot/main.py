@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict
 
+from sc2.data import Result
 from scipy.spatial import KDTree
 
 from bot.botai_ext import BotAIExt
@@ -104,3 +105,6 @@ class Kitten(BotAIExt):
         compare_health: float = max(50.0, unit.health_max * 0.09)
         if unit.health < compare_health:
             unit(AbilityId.CANCEL_BUILDINPROGRESS)
+
+    async def on_end(self, game_result: Result) -> None:
+        self.agent.on_episode_end(game_result)

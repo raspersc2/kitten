@@ -9,6 +9,7 @@ from os import path
 from typing import Dict, List
 
 import torch
+from sc2.data import Result
 from torch import optim, nn
 
 from bot.botai_ext import BotAIExt
@@ -44,6 +45,7 @@ class OfflineAgent(BaseAgent):
         "rewards",
         "dones",
         "values",
+        "current_rollout_step",
     )
 
     def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing):
@@ -87,6 +89,7 @@ class OfflineAgent(BaseAgent):
         self.rewards = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
         self.dones = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
         self.values = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
+        self.current_rollout_step: int = 0
 
     def choose_action(
         self,
@@ -97,6 +100,14 @@ class OfflineAgent(BaseAgent):
         attack_target: Point2,
         rally_point: Point2,
     ) -> int:
+        super(OfflineAgent, self).choose_action(
+            squads,
+            pos_of_squad,
+            all_close_enemy,
+            squad_units,
+            attack_target,
+            rally_point,
+        )
         reward: float = self.reward
         obs = self.features.transform_obs(
             self.pathing.ground_grid, pos_of_squad, attack_target, rally_point
@@ -126,9 +137,27 @@ class OfflineAgent(BaseAgent):
                 self.dones,
             )
             self.action_distribution[action] += 1
+            if self.current_rollout_step < NUM_ROLLOUT_STEPS:
+                self.current_rollout_step += 1
+            else:
+                # TODO: Store things to disk
+                pass
             return action.item()
 
     def on_episode_end(self, result):
-        pass
+        if self.training_active:
+            logger.info("On episode end called")
+            _reward = 5.0 if result == Result.Victory else -5.0
+            self.store_episode_data(
+                result,
+                self.epoch,
+                self.cumulative_reward + _reward,
+                self.action_distribution,
+            )
 
-    #
+            current_step: int = self.current_rollout_step
+            if current_step == NUM_ROLLOUT_STEPS:
+                current_step = NUM_ROLLOUT_STEPS - 1
+            self.rewards[current_step] = _reward
+            self.dones[current_step] = 1
+            # TODO: Store things to disk

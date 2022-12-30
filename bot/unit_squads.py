@@ -103,7 +103,9 @@ class UnitSquads:
                     action: int = self.agent.choose_action(
                         self.squads,
                         pos_of_largest_squad,
-                        Units([], self.ai),
+                        self.ai.all_enemy_units.filter(
+                            lambda u: u.distance_to(pos_of_largest_squad) < 15.0
+                        ),
                         squad.squad_units,
                         self.attack_target,
                         self.rally_point,
