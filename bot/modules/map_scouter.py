@@ -1,6 +1,7 @@
 import itertools
 from typing import Optional
 
+from bot.modules.terrain import Terrain
 from sc2.position import Point2
 
 from sc2.ids.unit_typeid import UnitTypeId
@@ -19,32 +20,21 @@ class MapScouter:
     Assign a marine to scout around the map so agent can pick up more data
     """
 
-    def __init__(self, ai: BotAI, unit_roles: UnitRoles) -> None:
+    def __init__(self, ai: BotAI, unit_roles: UnitRoles, terrain: Terrain) -> None:
         self.ai: BotAI = ai
         self.unit_roles: UnitRoles = unit_roles
-        self.expansion_distances: list[tuple[Point2, float]] = []
+        self.terrain: Terrain = terrain
+
         self.expansions_generator = None
         self.next_base_location: Optional[Point2] = None
 
         self.STEAL_FROM: set[UnitRoleTypes] = {UnitRoleTypes.ATTACKING}
 
     async def initialize(self) -> None:
-        # store all expansion locations, sorted by distance to spawn
-        for el in self.ai.expansion_locations_list:
-            if self.ai.start_location.distance_to(el) < self.ai.EXPANSION_GAP_THRESHOLD:
-                continue
-
-            distance = await self.ai.client.query_pathing(self.ai.start_location, el)
-            if distance:
-                self.expansion_distances.append((el, distance))
-
-        # sort by path length to each expansion
-        self.expansion_distances = sorted(
-            self.expansion_distances, key=lambda x: x[1], reverse=True
-        )
-
         # set up the expansion generator, so we can keep cycling through expansion locations
-        base_locations: list[Point2] = [el[0] for el in self.expansion_distances[1:]]
+        base_locations: list[Point2] = [
+            el[0] for el in self.terrain.expansion_distances[1:]
+        ]
         self.expansions_generator = itertools.cycle(base_locations)
         self.next_base_location = next(self.expansions_generator)
 

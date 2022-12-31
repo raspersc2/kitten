@@ -1,5 +1,7 @@
 from typing import Optional, List, Dict
 
+from sc2.position import Point3
+
 from sc2.data import Result
 from scipy.spatial import KDTree
 
@@ -15,6 +17,7 @@ from bot.consts import AgentClass, ConfigSettings
 from bot.modules.macro import Macro
 from bot.modules.map_scouter import MapScouter
 from bot.state import State
+from bot.modules.terrain import Terrain
 from bot.modules.unit_roles import UnitRoles
 from bot.unit_squads import UnitSquads
 from bot.modules.workers import WorkersManager
@@ -55,7 +58,8 @@ class Kitten(BotAIExt):
         self.debug: bool = self.config[ConfigSettings.DEBUG]
 
         self.unit_roles: UnitRoles = UnitRoles(self)
-        self.map_scouter: MapScouter = MapScouter(self, self.unit_roles)
+        self.terrain: Terrain = Terrain(self)
+        self.map_scouter: MapScouter = MapScouter(self, self.unit_roles, self.terrain)
 
         self.workers_manager: WorkersManager = WorkersManager(self, self.unit_roles)
         self.sent_chat: bool = False
@@ -76,11 +80,16 @@ class Kitten(BotAIExt):
         self.macro: Macro = Macro(
             self, self.unit_roles, self.workers_manager, self.map_data, self.debug
         )
-        self.unit_squads: UnitSquads = UnitSquads(self, self.unit_roles, self.agent)
+        self.unit_squads: UnitSquads = UnitSquads(
+            self, self.unit_roles, self.agent, self.terrain
+        )
         self.client.game_step = self.config[ConfigSettings.GAME_STEP]
         self.client.raw_affects_selection = True
         self.agent.get_episode_data()
+
+        await self.terrain.initialize()
         await self.map_scouter.initialize()
+
         for worker in self.units(UnitTypeId.SCV):
             worker.gather(self.mineral_field.closest_to(worker))
             self.unit_roles.catch_unit(worker)
@@ -112,6 +121,13 @@ class Kitten(BotAIExt):
             self.sent_chat = True
 
         if self.debug:
+            height: float = self.get_terrain_z_height(self.terrain.own_nat)
+            self.client.debug_text_world(
+                f"Own nat", Point3((*self.terrain.own_nat, height)), size=11
+            )
+            self.client.debug_text_world(
+                f"Enemy nat", Point3((*self.terrain.enemy_nat, height)), size=11
+            )
             for unit in self.all_units:
                 self.client.debug_text_world(f"{unit.tag}", unit, size=9)
 

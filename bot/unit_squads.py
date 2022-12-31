@@ -8,8 +8,9 @@ from typing import Set, Dict, Any, List, Optional
 from loguru import logger
 
 from bot.botai_ext import BotAIExt
-from bot.consts import UnitRoleTypes, SQUAD_ACTIONS, SquadActionType
+from bot.consts import UnitRoleTypes, SQUAD_ACTIONS, SquadActionType, TOWNHALL_TYPES
 from bot.modules.pathing import Pathing
+from bot.modules.terrain import Terrain
 from bot.modules.unit_roles import UnitRoles
 from bot.squad_agent.base_agent import BaseAgent
 from bot.unit_squad import UnitSquad
@@ -23,6 +24,7 @@ class UnitSquads:
         "ai",
         "unit_roles",
         "agent",
+        "terrain",
         "assigned_unit_tags",
         "squads",
         "squads_dict",
@@ -34,11 +36,14 @@ class UnitSquads:
         "TAGS",
     )
 
-    def __init__(self, ai: BotAIExt, unit_roles: UnitRoles, agent: BaseAgent):
+    def __init__(
+        self, ai: BotAIExt, unit_roles: UnitRoles, agent: BaseAgent, terrain: Terrain
+    ):
 
         self.ai: BotAIExt = ai
         self.unit_roles: UnitRoles = unit_roles
         self.agent: BaseAgent = agent
+        self.terrain: Terrain = terrain
 
         self.squads: List[UnitSquad] = []
 
@@ -312,16 +317,27 @@ class UnitSquads:
             self.rally_point = self.ai.main_base_ramp.top_center
 
     def _set_attack_target(self) -> None:
-        if enemy_units := self.ai.enemy_units:
+        # head towards enemy expansions outside natural by default
+        if townhalls := self.ai.enemy_structures.filter(
+            lambda s: s.type_id in TOWNHALL_TYPES
+            and s.distance_to(self.terrain.enemy_nat) > 12.0
+            and s.distance_to(self.ai.enemy_start_locations[0]) > 12.0
+        ):
+            self.attack_target = townhalls.furthest_to(
+                self.ai.enemy_start_locations[0]
+            ).position
+
+        # then enemy center mass
+        elif enemy_units := self.ai.enemy_units:
             center_mass, num = self.ai.center_mass(enemy_units)
             if num >= 5:
                 self.attack_target = center_mass
-                return
 
-        if enemy_structures := self.ai.enemy_structures:
+        # then anything else
+        elif enemy_structures := self.ai.enemy_structures:
             self.attack_target = enemy_structures.closest_to(
                 self.ai.game_info.map_center
             ).position
-            return
 
-        self.attack_target = self.ai.enemy_start_locations[0]
+        else:
+            self.attack_target = self.ai.enemy_start_locations[0]

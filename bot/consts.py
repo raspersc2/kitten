@@ -3,6 +3,16 @@ from typing import Set, Dict
 
 from sc2.ids.unit_typeid import UnitTypeId
 
+TOWNHALL_TYPES: set[UnitTypeId] = {
+    UnitTypeId.HATCHERY,
+    UnitTypeId.LAIR,
+    UnitTypeId.HIVE,
+    UnitTypeId.NEXUS,
+    UnitTypeId.COMMANDCENTER,
+    UnitTypeId.ORBITALCOMMAND,
+    UnitTypeId.PLANETARYFORTRESS,
+}
+
 
 class AgentClass(str, Enum):
     OFFLINE_AGENT = "OfflineAgent"
