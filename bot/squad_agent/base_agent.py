@@ -6,17 +6,15 @@ import json
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
 from os import path
+from typing import List, Dict, Optional
 
 import torch
 from loguru import logger
-from typing import List, Dict, Optional
-
-from sc2.data import Result
 from torch.utils.tensorboard import SummaryWriter
 
-from sc2.bot_ai import BotAI
-
 from bot.consts import SQUAD_ACTIONS, ConfigSettings
+from sc2.bot_ai import BotAI
+from sc2.data import Result
 from sc2.position import Point2
 from sc2.unit import Unit
 from sc2.units import Units

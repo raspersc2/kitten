@@ -2,14 +2,13 @@ from typing import List, Tuple
 
 import numpy as np
 import torch
-from sc2.position import Point2
 from torch.nn.functional import one_hot
-
-from sc2.ids.unit_typeid import UnitTypeId
-from sc2.ids.upgrade_id import UpgradeId
 
 from bot.botai_ext import BotAIExt
 from bot.consts import ConfigSettings, BUFF_TYPES, UNIT_TYPES
+from sc2.ids.unit_typeid import UnitTypeId
+from sc2.ids.upgrade_id import UpgradeId
+from sc2.position import Point2
 
 # since we one hot encode unit type ids we don't want to hot encode 1961+ different values
 # so convert all unit type ids into our own index from consts

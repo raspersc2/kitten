@@ -2,8 +2,8 @@ from collections import defaultdict
 from typing import Dict, Set, List, DefaultDict, Optional
 
 from bot.consts import UnitRoleTypes, WORKERS_DEFEND_AGAINST
+from bot.modules.unit_roles import UnitRoles
 from bot.state import State
-from bot.unit_roles import UnitRoles
 from sc2.bot_ai import BotAI
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId

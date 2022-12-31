@@ -14,7 +14,7 @@ from torch import optim, nn
 
 from bot.botai_ext import BotAIExt
 from bot.consts import ConfigSettings, SQUAD_ACTIONS
-from bot.pathing import Pathing
+from bot.modules.pathing import Pathing
 from bot.squad_agent.architecture.actor_critic import ActorCritic
 from bot.squad_agent.base_agent import BaseAgent
 from bot.squad_agent.features import Features

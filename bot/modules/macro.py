@@ -2,20 +2,17 @@
 Basic macro that focuses on bio production and upgrades
 This should probably be rewritten / refactored into separate files for anything more complicated
 """
-from typing import Optional, List, Set, Tuple
-
-import numpy as np
-from sc2.ids.upgrade_id import UpgradeId
+from typing import Optional, List, Set
 
 from MapAnalyzer import MapData, Region
 from bot.botai_ext import BotAIExt
 from bot.consts import UnitRoleTypes
+from bot.modules.unit_roles import UnitRoles
+from bot.modules.workers import WorkersManager
 from bot.state import State
-from bot.unit_roles import UnitRoles
-from bot.workers_manager import WorkersManager
-from sc2.bot_ai import BotAI
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
+from sc2.ids.upgrade_id import UpgradeId
 from sc2.position import Point2, Point3, Pointlike
 from sc2.unit import Unit
 from sc2.units import Units

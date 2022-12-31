@@ -1,14 +1,20 @@
 from typing import Dict, Set, Union, Optional, List
 
-from sc2.bot_ai import BotAI
 from bot.consts import UnitRoleTypes
+from sc2.bot_ai import BotAI
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.unit import Unit
 from sc2.units import Units
 
 
 class UnitRoles:
-    __slots__ = "ai", "unit_role_dict", "tag_to_role_dict", "all_assigned_tags", "WORKER_TYPES"
+    __slots__ = (
+        "ai",
+        "unit_role_dict",
+        "tag_to_role_dict",
+        "all_assigned_tags",
+        "WORKER_TYPES",
+    )
 
     def __init__(self, ai: BotAI):
         self.ai: BotAI = ai

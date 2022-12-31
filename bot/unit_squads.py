@@ -3,18 +3,17 @@ Create and manage unit squad bookkeeping.
 Note: squad actions are carried out in `unit_squad.py`
 """
 import uuid
-from typing import Set, Dict, Any, List, Optional, Callable
+from typing import Set, Dict, Any, List, Optional
+
 from loguru import logger
-from sc2.unit import Unit
 
 from bot.botai_ext import BotAIExt
-from bot.pathing import Pathing
-from sc2.ids.ability_id import AbilityId
-
 from bot.consts import UnitRoleTypes, SQUAD_ACTIONS, SquadActionType
+from bot.modules.pathing import Pathing
+from bot.modules.unit_roles import UnitRoles
 from bot.squad_agent.base_agent import BaseAgent
-from bot.unit_roles import UnitRoles
 from bot.unit_squad import UnitSquad
+from sc2.ids.ability_id import AbilityId
 from sc2.position import Point2
 from sc2.units import Units
 

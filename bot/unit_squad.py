@@ -1,14 +1,12 @@
 from typing import Set, Union, Optional, Dict
 
-from sc2.ids.upgrade_id import UpgradeId
-
-from bot.pathing import Pathing
-from sc2.unit import Unit
-
 from bot.botai_ext import BotAIExt
-from sc2.position import Point2
-from sc2.units import Units
+from bot.modules.pathing import Pathing
 from sc2.ids.ability_id import AbilityId
+from sc2.ids.upgrade_id import UpgradeId
+from sc2.position import Point2
+from sc2.unit import Unit
+from sc2.units import Units
 
 
 class UnitSquad:
