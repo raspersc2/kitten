@@ -47,6 +47,7 @@ class UnitRoleTypes(Enum):
     ATTACKING = auto()
     BUILDING = auto()
     GATHERING = auto()
+    MAP_SCOUTER = auto()
     WORKER_DEFENDER = auto()
 
 

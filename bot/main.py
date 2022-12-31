@@ -13,6 +13,7 @@ import yaml
 
 from bot.consts import AgentClass, ConfigSettings
 from bot.modules.macro import Macro
+from bot.modules.map_scouter import MapScouter
 from bot.state import State
 from bot.modules.unit_roles import UnitRoles
 from bot.unit_squads import UnitSquads
@@ -54,6 +55,7 @@ class Kitten(BotAIExt):
         self.debug: bool = self.config[ConfigSettings.DEBUG]
 
         self.unit_roles: UnitRoles = UnitRoles(self)
+        self.map_scouter: MapScouter = MapScouter(self, self.unit_roles)
 
         self.workers_manager: WorkersManager = WorkersManager(self, self.unit_roles)
         self.sent_chat: bool = False
@@ -78,6 +80,7 @@ class Kitten(BotAIExt):
         self.client.game_step = self.config[ConfigSettings.GAME_STEP]
         self.client.raw_affects_selection = True
         self.agent.get_episode_data()
+        await self.map_scouter.initialize()
         for worker in self.units(UnitTypeId.SCV):
             worker.gather(self.mineral_field.closest_to(worker))
             self.unit_roles.catch_unit(worker)
@@ -93,6 +96,7 @@ class Kitten(BotAIExt):
         await self.unit_squads.update(iteration, self.pathing)
         await self.macro.update(state, iteration)
         self.workers_manager.update(state, iteration)
+        self.map_scouter.update()
         # reasonable assumption the pathing module does not need updating early on
         # if self.time > 60.0:
         self.pathing.update(iteration)
