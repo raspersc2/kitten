@@ -3,6 +3,7 @@ Debug: True
 GameStep: 4
 VisualizeSpatialFeatures: False
 SquadAgent:
+  AgentClass: "OfflineAgent"
   CheckPointName: "checkpoint.pt"
   InferenceMode: False
   # Offline agent stores states, actions, rewards etc. here

@@ -11,7 +11,7 @@ from sc2.ids.unit_typeid import UnitTypeId
 from sc2.unit import Unit
 import yaml
 
-from bot.consts import ConfigSettings
+from bot.consts import AgentClass, ConfigSettings
 from bot.macro import Macro
 from bot.state import State
 from bot.unit_roles import UnitRoles
@@ -61,7 +61,16 @@ class Kitten(BotAIExt):
     async def on_start(self) -> None:
         self.map_data = MapData(self)
         self.pathing = Pathing(self, self.map_data)
-        self.agent = OfflineAgent(self, self.config, self.pathing)
+
+        # TODO: Improve this, handle invalid options in config and don't use if/else
+        if (
+            self.config[ConfigSettings.SQUAD_AGENT][ConfigSettings.AGENT_CLASS]
+            == AgentClass.OFFLINE_AGENT
+        ):
+            self.agent = OfflineAgent(self, self.config, self.pathing)
+        else:
+            self.agent = RandomAgent(self, self.config, self.pathing)
+
         self.macro: Macro = Macro(
             self, self.unit_roles, self.workers_manager, self.map_data, self.debug
         )

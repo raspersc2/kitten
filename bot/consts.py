@@ -4,7 +4,13 @@ from typing import Set, Dict
 from sc2.ids.unit_typeid import UnitTypeId
 
 
+class AgentClass(str, Enum):
+    OFFLINE_AGENT = "OfflineAgent"
+    RANDOM_AGENT = "RandomAgent"
+
+
 class ConfigSettings(str, Enum):
+    AGENT_CLASS = "AgentClass"
     DATA_DIRECTORY = "DataDirectory"
     DEBUG = "Debug"
     CHECKPOINT_NAME = "CheckPointName"
