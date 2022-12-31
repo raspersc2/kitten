@@ -5,6 +5,7 @@ VisualizeSpatialFeatures: False
 SquadAgent:
   AgentClass: "OfflineAgent"
   CheckPointName: "checkpoint.pt"
-  InferenceMode: False
+  # Keep on True for OfflineAgent
+  InferenceMode: True
   # Offline agent stores states, actions, rewards etc. here
-  StateDirectory: "states"
+  StateDirectory: "/states"

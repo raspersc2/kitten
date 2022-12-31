@@ -95,11 +95,11 @@ class Kitten(BotAIExt):
             self.unit_roles.catch_unit(worker)
 
     async def on_step(self, iteration: int) -> None:
-        unit_position_list: List[List[float]] = [
-            [unit.position.x, unit.position.y] for unit in self.enemy_units
-        ]
-        if unit_position_list:
-            self.enemy_tree = KDTree(unit_position_list)
+        # unit_position_list: List[List[float]] = [
+        #     [unit.position.x, unit.position.y] for unit in self.enemy_units
+        # ]
+        # if unit_position_list:
+        #     self.enemy_tree = KDTree(unit_position_list)
 
         state: State = State(self)
         await self.unit_squads.update(iteration, self.pathing)
@@ -107,8 +107,8 @@ class Kitten(BotAIExt):
         self.workers_manager.update(state, iteration)
         self.map_scouter.update()
         # reasonable assumption the pathing module does not need updating early on
-        # if self.time > 60.0:
-        self.pathing.update(iteration)
+        if self.time > 60.0:
+            self.pathing.update(iteration)
 
         if (
             self.time > 5.0
@@ -119,6 +119,15 @@ class Kitten(BotAIExt):
                 f"Meow! This kitty has trained for {len(self.agent.all_episode_data)} episodes (happy)"
             )
             self.sent_chat = True
+
+        if self.time > 179.0 and self.state.game_loop % 672 == 0:
+            reward: float = self.agent.cumulative_reward
+            emotion: str = (
+                "meow" if reward == 0.0 else ("growl" if reward < 0.0 else "purr")
+            )
+            await self.chat_send(
+                f"Cumulative episode reward: {round(reward, 4)} ...{emotion}"
+            )
 
         if self.debug:
             height: float = self.get_terrain_z_height(self.terrain.own_nat)

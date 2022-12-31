@@ -4,7 +4,7 @@ The offline agent goal is to collect state, actions and rewards and store them t
 RL Training (back propagation) should then be carried out via a separate process / script
     after the game is complete
 """
-
+import os
 from os import path
 from typing import Dict, List
 
@@ -22,12 +22,13 @@ from sc2.position import Point2
 from sc2.units import Units
 
 from loguru import logger
+import uuid
 
 NUM_ENVS: int = 1
 NUM_ROLLOUT_STEPS: int = 64
 SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 37, 120, 120)
-ENTITY_SHAPE: tuple[int, int, int] = (1, 256, 405)
-SCALAR_SHAPE: tuple[int, int] = (1, 10)
+ENTITY_SHAPE: tuple[int, int, int] = (1, 256, 406)
+SCALAR_SHAPE: tuple[int, int] = (1, 8)
 
 
 class OfflineAgent(BaseAgent):
@@ -38,6 +39,8 @@ class OfflineAgent(BaseAgent):
         "optimizer",
         "initial_lstm_state",
         "current_lstm_state",
+        "entities",
+        "spatials",
         "scalars",
         "actions",
         "locations",
@@ -46,6 +49,9 @@ class OfflineAgent(BaseAgent):
         "dones",
         "values",
         "current_rollout_step",
+        "game_id",
+        "save_tensors_path",
+        "data_chunk",
     )
 
     def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing):
@@ -82,6 +88,10 @@ class OfflineAgent(BaseAgent):
 
         self.current_lstm_state = self.initial_lstm_state
 
+        self.entities = torch.zeros((NUM_ROLLOUT_STEPS,) + ENTITY_SHAPE).to(self.device)
+        self.spatials = torch.zeros((NUM_ROLLOUT_STEPS,) + SPATIAL_SHAPE).to(
+            self.device
+        )
         self.scalars = torch.zeros((NUM_ROLLOUT_STEPS,) + SCALAR_SHAPE).to(self.device)
         self.actions = torch.zeros((NUM_ROLLOUT_STEPS,) + (1,)).to(self.device)
         self.locations = torch.zeros((NUM_ROLLOUT_STEPS,) + (1, 256, 2)).to(self.device)
@@ -90,6 +100,16 @@ class OfflineAgent(BaseAgent):
         self.dones = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
         self.values = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
         self.current_rollout_step: int = 0
+
+        # location where to save state, actions, rewards for offline training
+        self.game_id: str = uuid.uuid4().hex
+        state_dir: str = self.config[ConfigSettings.SQUAD_AGENT][
+            ConfigSettings.STATE_DIRECTORY
+        ]
+        self.save_tensors_path = f"{self.DATA_DIR}{state_dir}/{self.game_id}/"
+        os.makedirs(self.save_tensors_path)
+
+        self.data_chunk: int = 0
 
     def choose_action(
         self,
@@ -119,7 +139,7 @@ class OfflineAgent(BaseAgent):
         entity = nn.functional.normalize(entity)
 
         self.cumulative_reward += reward
-        self.squad_reward = 0.0
+
         with torch.no_grad():
             (
                 action,
@@ -137,11 +157,32 @@ class OfflineAgent(BaseAgent):
                 self.dones,
             )
             self.action_distribution[action] += 1
+            step: int = self.current_rollout_step
             if self.current_rollout_step < NUM_ROLLOUT_STEPS:
                 self.current_rollout_step += 1
+                self.entities[step] = entity
+                self.scalars[step] = scalar
+                self.spatials[step] = processed_spatial
+                self.locations[step] = locations
+                self.actions[step] = action
+                self.logprobs[step] = logprob
+                self.rewards[step] = self.reward
+                self.squad_reward = 0.0
             else:
-                # TODO: Store things to disk
-                pass
+                self.current_rollout_step = 0
+                torch.save(
+                    {
+                        "entities": self.entities,
+                        "scalars": self.scalars,
+                        "spatials": self.spatials,
+                        "locations": self.locations,
+                        "actions": self.actions,
+                        "logprobs": self.logprobs,
+                        "rewards": self.rewards,
+                    },
+                    f"{self.save_tensors_path}tensors_{self.data_chunk}.pt",
+                )
+                self.data_chunk += 1
             return action.item()
 
     def on_episode_end(self, result):
