@@ -39,7 +39,7 @@ class MapScouter:
         self.next_base_location = next(self.expansions_generator)
 
     def update(self) -> None:
-        if self.ai.time < 260.0:
+        if self.ai.time < 185.0:
             return
 
         existing_map_scouters: Units = self.unit_roles.get_units_from_role(

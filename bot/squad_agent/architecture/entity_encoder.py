@@ -13,7 +13,7 @@ class EntityEncoder(nn.Module):
     def __init__(self, device):
         super(EntityEncoder, self).__init__()
         self.device = device
-        self.embed = layer_init(nn.Linear(405, 128))
+        self.embed = layer_init(nn.Linear(406, 128))
         self.tf_layer = nn.TransformerEncoderLayer(128, 2, batch_first=True)
         self.tf = nn.TransformerEncoder(self.tf_layer, 4)
         self.conv1 = nn.Conv1d(128, 128, kernel_size=1, stride=1, padding=0, bias=True)
