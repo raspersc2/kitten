@@ -34,6 +34,7 @@ class Kitten(BotAIExt):
         "CONFIG_FILE",
         "config",
         "debug",
+        "sent_chat",
     )
 
     def __init__(self):
@@ -55,6 +56,7 @@ class Kitten(BotAIExt):
         self.unit_roles: UnitRoles = UnitRoles(self)
 
         self.workers_manager: WorkersManager = WorkersManager(self, self.unit_roles)
+        self.sent_chat: bool = False
 
     async def on_start(self) -> None:
         self.map_data = MapData(self)
@@ -85,6 +87,16 @@ class Kitten(BotAIExt):
         # reasonable assumption the pathing module does not need updating early on
         # if self.time > 60.0:
         self.pathing.update(iteration)
+
+        if (
+            self.time > 5.0
+            and not self.sent_chat
+            and isinstance(self.agent, OfflineAgent)
+        ):
+            await self.chat_send(
+                f"Meow! This kitty has trained for {len(self.agent.all_episode_data)} episodes (happy)"
+            )
+            self.sent_chat = True
 
         if self.debug:
             for unit in self.all_units:
