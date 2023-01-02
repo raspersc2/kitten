@@ -63,9 +63,14 @@ class OfflineAgent(BaseAgent):
         self.pathing: Pathing = pathing
 
         grid = self.pathing.map_data.get_pyastar_grid()
-        self.model = ActorCritic(len(SQUAD_ACTIONS), self.device, self.ai, grid).to(
-            self.device
-        )
+
+        self.model = ActorCritic(
+            len(SQUAD_ACTIONS),
+            self.device,
+            grid,
+            self.ai.game_info.map_size[1],
+            self.ai.game_info.map_size[0],
+        ).to(self.device)
         self.optimizer = optim.AdamW(self.model.parameters(), lr=2.5e-4, eps=1e-5)
         if path.isfile(self.CHECKPOINT_PATH):
             self.model, self.optimizer, self.epoch = self.load_checkpoint(

@@ -28,10 +28,9 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class Encoder(nn.Module):
-    def __init__(self, device, ai, grid: np.ndarray):
+    def __init__(self, device, grid: np.ndarray, height: int, width: int):
         super(Encoder, self).__init__()
         self.device = device
-        self.ai = ai
         self.cropped_cols: Optional[np.ndarray] = None
         self.cropped_rows: Optional[np.ndarray] = None
         self.entity_encoder = EntityEncoder(device)
@@ -41,6 +40,8 @@ class Encoder(nn.Module):
         self.scalar_fc1 = layer_init(nn.Linear(8, 32))
         self.scalar_fc2 = layer_init(nn.Linear(32, 4))
         self.first_iteration: bool = True
+        self.height: int = height
+        self.width: int = width
         self._get_cropped_cols_and_rows(grid)
 
     def forward(
@@ -95,11 +96,7 @@ class Encoder(nn.Module):
         """
         Integrates non-spatial information (unit attributes) and spatial information
         """
-        B, H, W = (
-            entity_locations.shape[0],
-            self.ai.game_info.map_size[1],
-            self.ai.game_info.map_size[0],
-        )
+        B, H, W = (entity_locations.shape[0], self.height, self.width)
         entity_num = entity_locations.shape[1]
         index = entity_locations.view(-1, 2).long().to(self.device)
         bias = arange(B).unsqueeze(1).repeat(1, entity_num).view(-1).to(self.device)

@@ -12,10 +12,9 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, action_space_size: int, device, ai, grid: np.ndarray):
+    def __init__(self, action_space_size: int, device, grid: np.ndarray, height: int, width: int):
         super().__init__()
-        self.ai = ai
-        self.shared_layers = Encoder(device, ai, grid)
+        self.shared_layers = Encoder(device, grid, height, width)
 
         self.lstm = nn.LSTM(292, 128)
         for name, param in self.lstm.named_parameters():
