@@ -28,7 +28,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class Encoder(nn.Module):
-    def __init__(self, device, grid: np.ndarray, height: int, width: int):
+    def __init__(self, device, grid: Optional[np.ndarray], height: int, width: int):
         super(Encoder, self).__init__()
         self.device = device
         self.cropped_cols: Optional[np.ndarray] = None
@@ -42,7 +42,9 @@ class Encoder(nn.Module):
         self.first_iteration: bool = True
         self.height: int = height
         self.width: int = width
-        self._get_cropped_cols_and_rows(grid)
+        # not required if learning from saved data
+        if grid is not None:
+            self._get_cropped_cols_and_rows(grid)
 
     def forward(
         self, spatial, entity, scalar, locations, process: bool = True

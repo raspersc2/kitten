@@ -9,6 +9,8 @@ from os import path
 from typing import Dict, List
 
 import torch
+
+from bot.squad_agent.utils import load_checkpoint, save_checkpoint
 from sc2.data import Result
 from torch import optim, nn
 
@@ -73,12 +75,15 @@ class OfflineAgent(BaseAgent):
         ).to(self.device)
         self.optimizer = optim.AdamW(self.model.parameters(), lr=2.5e-4, eps=1e-5)
         if path.isfile(self.CHECKPOINT_PATH):
-            self.model, self.optimizer, self.epoch = self.load_checkpoint(
-                self.model, self.optimizer, self.device
+            self.model, self.optimizer, self.epoch = load_checkpoint(
+                self.CHECKPOINT_PATH, self.model, self.optimizer, self.device
             )
+            logger.info(f"Loaded existing model at {self.CHECKPOINT_PATH}")
         # nothing stored on disk yet, there should be something there for the training script later
         else:
-            self.save_checkpoint(self.model, self.optimizer)
+            save_checkpoint(
+                self.CHECKPOINT_PATH, self.epoch, self.model, self.optimizer
+            )
 
         self.model.train() if self.training_active else self.model.eval()
 

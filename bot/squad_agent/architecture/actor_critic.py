@@ -1,3 +1,5 @@
+from typing import Optional
+
 from torch import cat, flatten, nn
 from torch.distributions import Categorical
 import numpy as np
@@ -12,7 +14,14 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, action_space_size: int, device, grid: np.ndarray, height: int, width: int):
+    def __init__(
+        self,
+        action_space_size: int,
+        device,
+        grid: Optional[np.ndarray],
+        height: int,
+        width: int,
+    ):
         super().__init__()
         self.shared_layers = Encoder(device, grid, height, width)
 
