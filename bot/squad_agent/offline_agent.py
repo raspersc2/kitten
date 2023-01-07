@@ -27,7 +27,6 @@ from loguru import logger
 import uuid
 
 NUM_ENVS: int = 1
-NUM_ROLLOUT_STEPS: int = 64
 SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 37, 120, 120)
 ENTITY_SHAPE: tuple[int, int, int] = (1, 256, 406)
 SCALAR_SHAPE: tuple[int, int] = (1, 8)
@@ -54,6 +53,7 @@ class OfflineAgent(BaseAgent):
         "game_id",
         "save_tensors_path",
         "data_chunk",
+        "num_rollout_steps",
     )
 
     def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing):
@@ -63,6 +63,9 @@ class OfflineAgent(BaseAgent):
 
         self.features: Features = Features(ai, config, 256, self.device)
         self.pathing: Pathing = pathing
+
+        ppo_settings: dict = self.config[ConfigSettings.SQUAD_AGENT][ConfigSettings.PPO]
+        self.num_rollout_steps: int = ppo_settings[ConfigSettings.NUM_ROLLOUT_STEPS]
 
         grid = self.pathing.map_data.get_pyastar_grid()
 
@@ -85,7 +88,9 @@ class OfflineAgent(BaseAgent):
                 self.CHECKPOINT_PATH, self.epoch, self.model, self.optimizer
             )
 
-        self.model.train() if self.training_active else self.model.eval()
+        # we are not ever training the model here, ensure it stays on evaluation
+        # TODO: Probably some optimizations we could do here
+        # self.model.eval()
 
         self.initial_lstm_state = (
             torch.zeros(
@@ -97,18 +102,18 @@ class OfflineAgent(BaseAgent):
         )
 
         self.current_lstm_state = self.initial_lstm_state
-
-        self.entities = torch.zeros((NUM_ROLLOUT_STEPS,) + ENTITY_SHAPE).to(self.device)
-        self.spatials = torch.zeros((NUM_ROLLOUT_STEPS,) + SPATIAL_SHAPE).to(
+        num_rollout_steps = self.num_rollout_steps
+        self.entities = torch.zeros((num_rollout_steps,) + ENTITY_SHAPE).to(self.device)
+        self.spatials = torch.zeros((num_rollout_steps,) + SPATIAL_SHAPE).to(
             self.device
         )
-        self.scalars = torch.zeros((NUM_ROLLOUT_STEPS,) + SCALAR_SHAPE).to(self.device)
-        self.actions = torch.zeros((NUM_ROLLOUT_STEPS,) + (1,)).to(self.device)
-        self.locations = torch.zeros((NUM_ROLLOUT_STEPS,) + (1, 256, 2)).to(self.device)
-        self.logprobs = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
-        self.rewards = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
-        self.dones = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
-        self.values = torch.zeros((NUM_ROLLOUT_STEPS, NUM_ENVS)).to(self.device)
+        self.scalars = torch.zeros((num_rollout_steps,) + SCALAR_SHAPE).to(self.device)
+        self.actions = torch.zeros((num_rollout_steps,) + (1,)).to(self.device)
+        self.locations = torch.zeros((num_rollout_steps,) + (1, 256, 2)).to(self.device)
+        self.logprobs = torch.zeros((num_rollout_steps, NUM_ENVS)).to(self.device)
+        self.rewards = torch.zeros((num_rollout_steps, NUM_ENVS)).to(self.device)
+        self.dones = torch.zeros((num_rollout_steps, NUM_ENVS)).to(self.device)
+        self.values = torch.zeros((num_rollout_steps, NUM_ENVS)).to(self.device)
         self.current_rollout_step: int = 0
 
         # location where to save state, actions, rewards for offline training
@@ -116,7 +121,7 @@ class OfflineAgent(BaseAgent):
         state_dir: str = self.config[ConfigSettings.SQUAD_AGENT][
             ConfigSettings.STATE_DIRECTORY
         ]
-        self.save_tensors_path = f"{self.DATA_DIR}{state_dir}/{self.game_id}/"
+        self.save_tensors_path = f"{self.DATA_DIR}/{state_dir}/{self.game_id}/"
         os.makedirs(self.save_tensors_path)
 
         self.data_chunk: int = 0
@@ -167,32 +172,37 @@ class OfflineAgent(BaseAgent):
                 self.dones,
             )
             self.action_distribution[action] += 1
+
             step: int = self.current_rollout_step
-            if self.current_rollout_step < NUM_ROLLOUT_STEPS:
-                self.current_rollout_step += 1
-                self.entities[step] = entity
-                self.scalars[step] = scalar
-                self.spatials[step] = processed_spatial
-                self.locations[step] = locations
-                self.actions[step] = action
-                self.logprobs[step] = logprob
-                self.rewards[step] = self.reward
-                self.squad_reward = 0.0
-            else:
-                self.current_rollout_step = 0
-                torch.save(
-                    {
-                        "entities": self.entities,
-                        "scalars": self.scalars,
-                        "spatials": self.spatials,
-                        "locations": self.locations,
-                        "actions": self.actions,
-                        "logprobs": self.logprobs,
-                        "rewards": self.rewards,
-                    },
-                    f"{self.save_tensors_path}tensors_{self.data_chunk}.pt",
-                )
-                self.data_chunk += 1
+
+            if self.training_active:
+                if self.current_rollout_step < self.num_rollout_steps:
+                    self.current_rollout_step += 1
+                    self.entities[step] = entity
+                    self.scalars[step] = scalar
+                    self.spatials[step] = processed_spatial
+                    self.locations[step] = locations
+                    self.actions[step] = action
+                    self.logprobs[step] = logprob
+                    self.rewards[step] = self.reward
+                    self.squad_reward = 0.0
+                else:
+                    self.current_rollout_step = 0
+                    torch.save(
+                        {
+                            "entities": self.entities,
+                            "scalars": self.scalars,
+                            "spatials": self.spatials,
+                            "locations": self.locations,
+                            "actions": self.actions,
+                            "logprobs": self.logprobs,
+                            "rewards": self.rewards,
+                            "dones": self.dones,
+                            "values": self.values,
+                        },
+                        f"{self.save_tensors_path}tensors_{self.data_chunk}.pt",
+                    )
+                    self.data_chunk += 1
             return action.item()
 
     def on_episode_end(self, result):
@@ -207,8 +217,8 @@ class OfflineAgent(BaseAgent):
             )
 
             current_step: int = self.current_rollout_step
-            if current_step == NUM_ROLLOUT_STEPS:
-                current_step = NUM_ROLLOUT_STEPS - 1
+            if current_step == self.num_rollout_steps:
+                current_step = self.num_rollout_steps - 1
             self.rewards[current_step] = _reward
             self.dones[current_step] = 1
             # TODO: Store things to disk
