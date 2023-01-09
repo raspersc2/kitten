@@ -1,4 +1,6 @@
-from torch import cat, flatten, nn
+from typing import Optional, Union
+
+from torch import cat, flatten, nn, Tensor
 from torch.distributions import Categorical
 import numpy as np
 
@@ -12,10 +14,16 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, action_space_size: int, device, ai, grid: np.ndarray):
+    def __init__(
+        self,
+        action_space_size: int,
+        device,
+        grid: Optional[np.ndarray],
+        height: int,
+        width: int,
+    ):
         super().__init__()
-        self.ai = ai
-        self.shared_layers = Encoder(device, ai, grid)
+        self.shared_layers = Encoder(device, grid, height, width)
 
         self.lstm = nn.LSTM(292, 128)
         for name, param in self.lstm.named_parameters():
@@ -28,17 +36,24 @@ class ActorCritic(nn.Module):
         self.value_layers = layer_init(nn.Linear(128, 1), std=1)
 
     def get_states(
-        self, spatial, entity, scalar, locations, lstm_state, done, process_spatial=True
+        self,
+        spatial: Tensor,
+        entity: Tensor,
+        scalar: Tensor,
+        locations: Tensor,
+        lstm_state: tuple[Tensor, Tensor],
+        done: Tensor,
+        process_spatial: bool = True,
     ):
         hidden, processed_spatial = self.shared_layers(
             spatial, entity, scalar, locations, process_spatial
         )
 
         # LSTM logic
-        batch_size = lstm_state[0].shape[1]
-        hidden = hidden.reshape((-1, batch_size, self.lstm.input_size))
+        batch_size: int = lstm_state[0].shape[1]
+        hidden: Tensor = hidden.reshape((-1, batch_size, self.lstm.input_size))
         done = done.reshape((-1, batch_size))
-        new_hidden = []
+        new_hidden: Union[list, Tensor] = []
         for h, d in zip(hidden, done):
             h, lstm_state = self.lstm(
                 h.unsqueeze(0),
@@ -52,8 +67,15 @@ class ActorCritic(nn.Module):
         return new_hidden, lstm_state, processed_spatial
 
     def get_value(
-        self, spatial, entity, scalar, locations, lstm_state, done, process_spatial
-    ):
+        self,
+        spatial: Tensor,
+        entity: Tensor,
+        scalar: Tensor,
+        locations: Tensor,
+        lstm_state: tuple[Tensor, Tensor],
+        done: Tensor,
+        process_spatial: bool,
+    ) -> float:
         hidden, _, _ = self.get_states(
             spatial, entity, scalar, locations, lstm_state, done, process_spatial
         )
@@ -61,14 +83,14 @@ class ActorCritic(nn.Module):
 
     def get_action_and_value(
         self,
-        spatial,
-        entity,
-        scalar,
-        locations,
-        lstm_state,
-        done,
-        action=None,
-        process_spatial=True,
+        spatial: Tensor,
+        entity: Tensor,
+        scalar: Tensor,
+        locations: Tensor,
+        lstm_state: tuple[Tensor, Tensor],
+        done: Tensor,
+        action: Tensor = None,
+        process_spatial: bool = True,
     ):
         hidden, lstm_state, processed_spatial = self.get_states(
             spatial, entity, scalar, locations, lstm_state, done, process_spatial
@@ -86,7 +108,7 @@ class ActorCritic(nn.Module):
             processed_spatial,
         )
 
-    def forward(self, spatial, entity, scalar):
+    def forward(self, spatial: Tensor, entity: Tensor, scalar: Tensor):
         z, processed_spatial = self.shared_layers(spatial, entity, scalar)
         policy_logits = self.policy_layers(z)
         value = self.value_layers(z)

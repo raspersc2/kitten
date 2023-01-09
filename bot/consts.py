@@ -21,13 +21,23 @@ class AgentClass(str, Enum):
 
 class ConfigSettings(str, Enum):
     AGENT_CLASS = "AgentClass"
+    BATCH_SIZE = "BatchSize"
+    CHECKPOINT_NAME = "CheckPointName"
+    CLIP_COEFFICIENT = "ClipCoefficient"
     DATA_DIRECTORY = "DataDirectory"
     DEBUG = "Debug"
-    CHECKPOINT_NAME = "CheckPointName"
+    ENTROPY_COEFFICIENT = "EntropyCoefficient"
+    GAE_LAMBDA = "GaeLambda"
+    GAMMA = "Gamma"
     GAME_STEP = "GameStep"
     INFERENCE_MODE = "InferenceMode"
+    MAX_GRAD_NORM = "MaxGradNorm"
+    NUM_ROLLOUT_STEPS = "NumRolloutSteps"
+    PPO = "PPO"
     STATE_DIRECTORY = "StateDirectory"
     SQUAD_AGENT = "SquadAgent"
+    UPDATE_POLICY_EPOCHS = "UpdatePolicyEpochs"
+    VF_COEFFICIENT = "VFCoefficient"
     VISUALIZE_SPATIAL_FEATURES = "VisualizeSpatialFeatures"
 
 

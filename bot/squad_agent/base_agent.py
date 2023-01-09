@@ -158,22 +158,6 @@ class BaseAgent(metaclass=ABCMeta):
         with open(self.ml_training_file_path, "w") as f:
             json.dump(self.all_episode_data, f)
 
-    def save_checkpoint(self, model, optimizer):
-        state = {
-            "epoch": self.epoch + 1,
-            "state_dict": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-        }
-        f_path = self.CHECKPOINT_PATH
-        torch.save(state, f_path)
-
-    def load_checkpoint(self, model, optimizer, device):
-        logger.info(f"Loaded existing model: {self.CHECKPOINT_PATH}")
-        checkpoint = torch.load(self.CHECKPOINT_PATH, map_location=torch.device(device))
-        model.load_state_dict(checkpoint["state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        return model, optimizer, checkpoint["epoch"]
-
     @staticmethod
     def _get_result_id(result: Result) -> int:
         """
