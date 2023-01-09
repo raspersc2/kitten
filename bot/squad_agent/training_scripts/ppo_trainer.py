@@ -17,7 +17,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from bot.consts import SQUAD_ACTIONS, ConfigSettings
 from bot.squad_agent.architecture.actor_critic import ActorCritic
-from bot.squad_agent.utils import load_checkpoint
+from bot.squad_agent.utils import load_checkpoint, save_checkpoint
+import shutil
 
 
 SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 37, 120, 120)
@@ -97,18 +98,33 @@ class PPOTrainer:
             makedirs(self.states_dir)
 
         self.remove_paths: List[path] = []
+        self.value_loss = 0.0
+        self.policy_loss = 0.0
 
     def learn(self) -> None:
         for game_folder in listdir(self.states_dir):
             game_dir: path = path.join(self.states_dir, game_folder)
             self.remove_paths.append(game_dir)
             for tensors_file in listdir(game_dir):
+
                 if tensors_file.endswith(".pt"):
+                    logger.info(f"Processing {tensors_file} from game id {game_folder}")
                     tensors = torch.load(
                         path.join(self.states_dir, game_folder, tensors_file),
                         map_location=self.device,
                     )
                     self._back_propagation(tensors)
+
+        for game_dir in self.remove_paths:
+            logger.info(f"Removing {game_dir} directory")
+            shutil.rmtree(game_dir)
+
+        logger.info(f"Saving updated model to {self.CHECKPOINT_PATH}")
+        save_checkpoint(self.CHECKPOINT_PATH, self.epoch, self.model, self.optimizer)
+
+        logger.info(
+            f"Training complete, Value loss: {self.value_loss}, Policy loss: {self.policy_loss}, Epoch: {self.epoch}"
+        )
 
     def _back_propagation(self, tensors: dict[str, Tensor]) -> None:
         with torch.no_grad():
@@ -174,7 +190,7 @@ class PPOTrainer:
             envinds = np.arange(1)
             flatinds: Tensor = torch.arange(self.batch_size).reshape(rollout_steps, 1)
             # split into 4 minibatches
-            mini_batch_ids: Tensor = torch.chunk(flatinds, 4, dim=0)
+            mini_batch_ids: list[Tensor] = torch.chunk(flatinds, 4, dim=0)
             current_minibatch: int = 0
             for epoch in range(self.update_policy_epochs):
                 # np.random.shuffle(envinds)
@@ -209,31 +225,29 @@ class PPOTrainer:
                     b_actions.long()[mb_inds],
                     process_spatial=False,
                 )
-                logratio: float = newlogprob - b_logprobs[mb_inds]
-                ratio: float = logratio.exp()
+                logratio = newlogprob - b_logprobs[mb_inds]
+                ratio = logratio.exp()
 
                 with torch.no_grad():
                     approx_kl = ((ratio - 1) - logratio).mean()
 
-                mb_advantages: float = b_advantages[mb_inds]
+                mb_advantages = b_advantages[mb_inds]
                 # normalize advantage
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (
                     mb_advantages.std() + 1e-8
                 )
 
-                clip: float = self.clip_coefficient
+                clip = self.clip_coefficient
                 # Policy loss
-                pg_loss1: float = -mb_advantages * ratio
-                pg_loss2: float = -mb_advantages * torch.clamp(
-                    ratio, 1 - clip, 1 + clip
-                )
-                pg_loss: float = torch.max(pg_loss1, pg_loss2).mean()
+                pg_loss1 = -mb_advantages * ratio
+                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - clip, 1 + clip)
+                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
-                newvalue: float = newvalue.view(-1)
+                newvalue = newvalue.view(-1)
                 # clip vloss:
-                v_loss_unclipped: float = (newvalue - b_returns[mb_inds]) ** 2
-                v_clipped: float = b_values[mb_inds] + torch.clamp(
+                v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
+                v_clipped = b_values[mb_inds] + torch.clamp(
                     newvalue - b_values[mb_inds],
                     -clip,
                     clip,
@@ -261,12 +275,14 @@ class PPOTrainer:
                 if approx_kl > 0.01:
                     break
 
+        self.value_loss = v_loss.item()
+        self.policy_loss = pg_loss.item()
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
         self.writer.add_scalar("rewards/mean_reward", rewards.mean(), self.epoch)
-        self.writer.add_scalar("losses/value_loss", v_loss.item(), self.epoch)
-        self.writer.add_scalar("losses/policy_loss", pg_loss.item(), self.epoch)
+        self.writer.add_scalar("losses/value_loss", self.value_loss, self.epoch)
+        self.writer.add_scalar("losses/policy_loss", self.policy_loss, self.epoch)
         self.writer.add_scalar("losses/entropy", entropy_loss.item(), self.epoch)
         self.writer.add_scalar("losses/explained_variance", explained_var, self.epoch)
         self.writer.add_scalar("losses/approx_kl", approx_kl.item(), self.epoch)
