@@ -12,7 +12,7 @@ from typing import Dict, List
 
 import yaml
 from loguru import logger
-from torch import optim, nn
+from torch import optim, nn, Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 from bot.consts import SQUAD_ACTIONS, ConfigSettings
@@ -110,28 +110,19 @@ class PPOTrainer:
                     )
                     self._back_propagation(tensors)
 
-    def _back_propagation(self, tensors: dict[str, torch.Tensor]) -> None:
+    def _back_propagation(self, tensors: dict[str, Tensor]) -> None:
         with torch.no_grad():
-            actions = tensors["actions"]
-            # actions = torch.autograd.Variable(actions, requires_grad=True)
-            logprobs = tensors["logprobs"]
-            # logprobs = torch.autograd.Variable(logprobs, requires_grad=True)
-            spatials = tensors["spatials"]
-            # spatials = torch.autograd.Variable(spatials, requires_grad=True)
-            entities = tensors["entities"]
-            # entities = torch.autograd.Variable(entities, requires_grad=True)
-            scalars = tensors["scalars"]
-            # scalars = torch.autograd.Variable(scalars, requires_grad=True)
-            locations = tensors["locations"]
-            # locations = torch.autograd.Variable(locations, requires_grad=True)
-            dones = tensors["dones"]
-            # dones = torch.autograd.Variable(dones, requires_grad=True)
-            rewards = tensors["rewards"]
-            # rewards = torch.autograd.Variable(rewards, requires_grad=True)
-            values = tensors["values"]
-            # values = torch.autograd.Variable(values, requires_grad=True)
+            actions: Tensor = tensors["actions"]
+            logprobs: Tensor = tensors["logprobs"]
+            spatials: Tensor = tensors["spatials"]
+            entities: Tensor = tensors["entities"]
+            scalars: Tensor = tensors["scalars"]
+            locations: Tensor = tensors["locations"]
+            dones: Tensor = tensors["dones"]
+            rewards: Tensor = tensors["rewards"]
+            values: Tensor = tensors["values"]
 
-            next_value = self.model.get_value(
+            next_value: float = self.model.get_value(
                 spatials[-1],
                 entities[-1],
                 scalars[-1],
@@ -141,8 +132,8 @@ class PPOTrainer:
                 False,
             ).reshape(1, -1)
 
-            advantages = torch.zeros_like(rewards).to(self.device)
-            last_gaelam = 0
+            advantages: Tensor = torch.zeros_like(rewards).to(self.device)
+            last_gaelam: float = 0.0
             rollout_steps: int = self.num_rollout_steps
             for t in reversed(range(rollout_steps)):
                 if t == rollout_steps - 1:
@@ -151,7 +142,7 @@ class PPOTrainer:
                 else:
                     next_non_terminal = 1.0 - 0
                     next_values = values[t + 1]
-                delta = (
+                delta: float = (
                     rewards[t]
                     + self.gamma * next_values * next_non_terminal
                     - values[t]
@@ -163,27 +154,27 @@ class PPOTrainer:
             returns = advantages + values
 
             # flatten the batch
-            b_entities = entities.reshape((-1,) + ENTITY_SHAPE)
-            b_entities = torch.squeeze(b_entities)
-            b_scalars = scalars.reshape((-1,) + SCALAR_SHAPE)
-            b_scalars = torch.squeeze(b_scalars)
-            b_spatials = spatials.reshape((-1,) + SPATIAL_SHAPE)
-            b_spatials = torch.squeeze(b_spatials)
-            b_locations = locations.reshape((-1,) + (256, 2))
-            b_locations = torch.squeeze(b_locations)
-            b_logprobs = logprobs.reshape(-1)
-            b_actions = actions.reshape(-1)
-            b_dones = dones.reshape(-1)
-            b_advantages = advantages.reshape(-1)
-            b_returns = returns.reshape(-1)
-            b_values = values.reshape(-1)
+            b_entities: Tensor = entities.reshape((-1,) + ENTITY_SHAPE)
+            b_entities: Tensor = torch.squeeze(b_entities)
+            b_scalars: Tensor = scalars.reshape((-1,) + SCALAR_SHAPE)
+            b_scalars: Tensor = torch.squeeze(b_scalars)
+            b_spatials: Tensor = spatials.reshape((-1,) + SPATIAL_SHAPE)
+            b_spatials: Tensor = torch.squeeze(b_spatials)
+            b_locations: Tensor = locations.reshape((-1,) + (256, 2))
+            b_locations: Tensor = torch.squeeze(b_locations)
+            b_logprobs: Tensor = logprobs.reshape(-1)
+            b_actions: Tensor = actions.reshape(-1)
+            b_dones: Tensor = dones.reshape(-1)
+            b_advantages: Tensor = advantages.reshape(-1)
+            b_returns: Tensor = returns.reshape(-1)
+            b_values: Tensor = values.reshape(-1)
 
             # train the network
             # envsperbatch = NUM_ENVS // NUM_MINIBATCHES
             envinds = np.arange(1)
-            flatinds = torch.arange(self.batch_size).reshape(rollout_steps, 1)
+            flatinds: Tensor = torch.arange(self.batch_size).reshape(rollout_steps, 1)
             # split into 4 minibatches
-            mini_batch_ids = torch.chunk(flatinds, 4, dim=0)
+            mini_batch_ids: Tensor = torch.chunk(flatinds, 4, dim=0)
             current_minibatch: int = 0
             for epoch in range(self.update_policy_epochs):
                 # np.random.shuffle(envinds)
@@ -193,7 +184,6 @@ class PPOTrainer:
                 # mb_inds = flatinds[:, mbenvinds].ravel()
                 mb_inds = mini_batch_ids[current_minibatch].squeeze()
                 current_minibatch += 1
-                print(mb_inds)
 
                 # mb_inds = np.random.randint(
                 #     NUM_ROLLOUT_STEPS, size=(NUM_ROLLOUT_STEPS // 4,)
@@ -219,13 +209,13 @@ class PPOTrainer:
                     b_actions.long()[mb_inds],
                     process_spatial=False,
                 )
-                logratio = newlogprob - b_logprobs[mb_inds]
-                ratio = logratio.exp()
+                logratio: float = newlogprob - b_logprobs[mb_inds]
+                ratio: float = logratio.exp()
 
                 with torch.no_grad():
                     approx_kl = ((ratio - 1) - logratio).mean()
 
-                mb_advantages = b_advantages[mb_inds]
+                mb_advantages: float = b_advantages[mb_inds]
                 # normalize advantage
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (
                     mb_advantages.std() + 1e-8
@@ -233,15 +223,17 @@ class PPOTrainer:
 
                 clip: float = self.clip_coefficient
                 # Policy loss
-                pg_loss1 = -mb_advantages * ratio
-                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - clip, 1 + clip)
-                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+                pg_loss1: float = -mb_advantages * ratio
+                pg_loss2: float = -mb_advantages * torch.clamp(
+                    ratio, 1 - clip, 1 + clip
+                )
+                pg_loss: float = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
-                newvalue = newvalue.view(-1)
+                newvalue: float = newvalue.view(-1)
                 # clip vloss:
-                v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                v_clipped = b_values[mb_inds] + torch.clamp(
+                v_loss_unclipped: float = (newvalue - b_returns[mb_inds]) ** 2
+                v_clipped: float = b_values[mb_inds] + torch.clamp(
                     newvalue - b_values[mb_inds],
                     -clip,
                     clip,
