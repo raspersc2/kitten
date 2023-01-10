@@ -4,7 +4,11 @@ from torch import cat, flatten, nn, Tensor
 from torch.distributions import Categorical
 import numpy as np
 
-from bot.squad_agent.architecture.encoder import Encoder
+# relative import required for training with docker
+try:
+    from bot.squad_agent.architecture.encoder import Encoder
+except ImportError:
+    from ...squad_agent.architecture.encoder import Encoder
 
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):

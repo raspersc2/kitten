@@ -1,5 +1,6 @@
 from typing import Optional, Tuple, List
 
+import numpy as np
 from torch import (
     arange,
     cat,
@@ -12,10 +13,15 @@ from torch import (
     zeros,
 )
 from torchvision.transforms.functional import resize
-import numpy as np
 
-from bot.squad_agent.architecture.entity_encoder import EntityEncoder
-from bot.squad_agent.architecture.spatial_encoder import SpatialEncoder
+# relative import required for training with docker
+try:
+    from bot.squad_agent.architecture.entity_encoder import EntityEncoder
+    from bot.squad_agent.architecture.spatial_encoder import SpatialEncoder
+except ImportError:
+    from ...squad_agent.architecture.entity_encoder import EntityEncoder
+    from ...squad_agent.architecture.spatial_encoder import SpatialEncoder
+
 from torch.nn.functional import relu
 
 SPATIAL_SIZE: List[int] = [120, 120]

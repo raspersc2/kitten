@@ -15,9 +15,16 @@ from loguru import logger
 from torch import optim, nn, Tensor
 from torch.utils.tensorboard import SummaryWriter
 
-from bot.consts import SQUAD_ACTIONS, ConfigSettings
-from bot.squad_agent.architecture.actor_critic import ActorCritic
-from bot.squad_agent.utils import load_checkpoint, save_checkpoint
+# need relative imports here, as this script might be run from a completely different location then expected
+try:
+    from bot.consts import SQUAD_ACTIONS, ConfigSettings
+    from bot.squad_agent.architecture.actor_critic import ActorCritic
+    from bot.squad_agent.utils import load_checkpoint, save_checkpoint
+except ImportError:
+    from ...consts import SQUAD_ACTIONS, ConfigSettings
+    from ...squad_agent.architecture.actor_critic import ActorCritic
+    from ...squad_agent.utils import load_checkpoint, save_checkpoint
+
 import shutil
 
 
@@ -29,12 +36,13 @@ SCALAR_SHAPE: tuple[int, int] = (1, 8)
 class PPOTrainer:
     def __init__(self, device: str = "cuda"):
         self.config: Dict = dict()
-        self.CONFIG_FILE = "config.yaml"
+        self.CONFIG_FILE = "../../../config.yaml"
 
         cwd = Path.cwd()
-        root_dir = cwd.parent.parent.parent
-
-        with open(path.join(root_dir, self.CONFIG_FILE), "r") as config_file:
+        # root_dir = cwd.parent.parent.parent
+        root_dir = Path(__file__).parent / "../../../"
+        config_path = Path(__file__).parent / self.CONFIG_FILE
+        with open(config_path, "r") as config_file:
             self.config = yaml.safe_load(config_file)
 
         self.DATA_DIR: str = path.join(
@@ -68,6 +76,7 @@ class PPOTrainer:
             self.device
         )
         self.optimizer = optim.AdamW(self.model.parameters(), lr=2.5e-4, eps=1e-5)
+        self.epoch: int = 0
 
         if path.isfile(self.CHECKPOINT_PATH):
             self.model, self.optimizer, self.epoch = load_checkpoint(
