@@ -90,7 +90,7 @@ class OfflineAgent(BaseAgent):
 
         # we are not ever training the model here, ensure it stays on evaluation
         # TODO: Probably some optimizations we could do here
-        # self.model.eval()
+        self.model.eval()
 
         self.initial_lstm_state = (
             torch.zeros(
