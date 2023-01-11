@@ -1,7 +1,8 @@
 DataDirectory: "./data"
 Debug: True
 GameStep: 4
-# Visualize processed spatial information being fed to the spatial encoder
+# Visualize processed spatial information
+# This shows exactly what will be passed through the conv layers
 VisualizeSpatialFeatures: False
 SquadAgent:
   AgentClass: "OfflineAgent"

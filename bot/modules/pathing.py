@@ -1,10 +1,11 @@
 from typing import Optional, Dict, List
 
 import numpy as np
+from sc2.ids.effect_id import EffectId
 from scipy import spatial
 
 from MapAnalyzer import MapData
-from bot.consts import ALL_STRUCTURES, INFLUENCE_COSTS
+from bot.consts import ALL_STRUCTURES, INFLUENCE_COSTS, EFFECT_COSTS
 from sc2.bot_ai import BotAI
 from sc2.position import Point2
 from sc2.unit import Unit
@@ -17,6 +18,7 @@ class Pathing:
         "map_data",
         "memory_unit_tags",
         "memory_units",
+        "effects_grid",
         "ground_grid",
         "TIME_IN_MEMORY",
         "RANGE_BUFFER",
@@ -27,6 +29,7 @@ class Pathing:
         self.map_data: Optional[MapData] = map_data
         self.memory_unit_tags: Dict[int, Dict] = dict()
         self.memory_units: Units = Units([], self.ai)
+        self.effects_grid: Optional[np.ndarray] = None
         self.ground_grid: Optional[np.ndarray] = None
         self.TIME_IN_MEMORY: float = 15.0
         # this buffer is fairly large, since we are pathing as a squad in this project
@@ -34,10 +37,13 @@ class Pathing:
         self.RANGE_BUFFER: float = 5.5
 
     def update(self, iteration: int) -> None:
-        # TODO: Add effects
-
         # get clean grid
-        self.ground_grid = self.map_data.get_pyastar_grid()
+        if self.ground_grid is None or iteration % 64 == 0:
+            grid = self.map_data.get_pyastar_grid()
+            self.ground_grid = grid.copy()
+            self.effects_grid = grid.copy()
+
+        self._add_effects()
 
         self.memory_units = Units([], self.ai)
         # Add enemy influence to ground grid and refresh memory of enemy units
@@ -78,6 +84,28 @@ class Pathing:
 
         for tag in tags_to_remove:
             self.remove_unit_tag(tag)
+
+    def _add_effects(self) -> None:
+        """Add effects influence to map"""
+
+        for effect in self.ai.state.effects:
+            if effect == EffectId.LURKERMP:
+                effect_costs = EFFECT_COSTS[effect.id]
+                for pos in effect.positions:
+                    self.effects_grid = self._add_cost(
+                        pos,
+                        effect_costs["GroundCost"],
+                        effect_costs["GroundRange"],
+                        self.effects_grid,
+                    )
+            elif effect.id in EFFECT_COSTS:
+                effect_costs = EFFECT_COSTS[effect.id]
+                self.effects_grid = self._add_cost(
+                    Point2.center(effect.positions),
+                    effect_costs["GroundCost"],
+                    effect_costs["GroundRange"],
+                    self.effects_grid,
+                )
 
     def find_closest_safe_spot(
         self, from_pos: Point2, grid: np.ndarray, radius: int = 15
@@ -206,7 +234,7 @@ class Pathing:
         """Or add "influence", mostly used to add enemies to a grid"""
 
         grid = self.map_data.add_cost(
-            position=(int(pos.x), int(pos.y)),
+            position=pos.rounded,
             radius=unit_range,
             grid=grid,
             weight=int(weight),

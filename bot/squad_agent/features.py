@@ -88,6 +88,7 @@ class Features:
     def transform_obs(
         self,
         ground_grid: np.ndarray,
+        effects_grid: np.ndarray,
         pos_of_squad: Point2,
         attack_target: Point2,
         rally_point: Point2,
@@ -99,7 +100,7 @@ class Features:
             self.append_unit(unit, alliance, unit_type)
 
         entity, entities_type, locations = self._process_entity_info()
-        spatial = self._process_spatial_info(ground_grid)
+        spatial = self._process_spatial_info(ground_grid, effects_grid)
         scalar: torch.Tensor = self._process_scalar_info(
             pos_of_squad, attack_target, rally_point
         )
@@ -213,7 +214,9 @@ class Features:
 
         return all_entities_array, entities_type, locations
 
-    def _process_spatial_info(self, ground_grid: np.ndarray) -> torch.Tensor:
+    def _process_spatial_info(
+        self, ground_grid: np.ndarray, effects_grid: np.ndarray
+    ) -> torch.Tensor:
 
         spatial_arr = []
         # location_grid = squad_grid.copy()
@@ -221,6 +224,10 @@ class Features:
         ground_grid = ground_grid[None, :]
         ground_grid = torch.from_numpy(ground_grid)
         spatial_arr.append(ground_grid)
+
+        effects_grid = effects_grid[None, :]
+        effects_grid = torch.from_numpy(effects_grid)
+        spatial_arr.append(effects_grid)
 
         spatial_arr.append(self.height)
 

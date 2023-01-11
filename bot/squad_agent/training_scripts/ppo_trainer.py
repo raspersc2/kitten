@@ -28,7 +28,7 @@ except ImportError:
 import shutil
 
 
-SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 37, 120, 120)
+SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 38, 120, 120)
 ENTITY_SHAPE: tuple[int, int, int] = (1, 256, 406)
 SCALAR_SHAPE: tuple[int, int] = (1, 8)
 

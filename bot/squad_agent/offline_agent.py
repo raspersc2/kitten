@@ -27,7 +27,7 @@ from loguru import logger
 import uuid
 
 NUM_ENVS: int = 1
-SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 37, 120, 120)
+SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 38, 120, 120)
 ENTITY_SHAPE: tuple[int, int, int] = (1, 256, 406)
 SCALAR_SHAPE: tuple[int, int] = (1, 8)
 
@@ -145,7 +145,11 @@ class OfflineAgent(BaseAgent):
         )
         reward: float = self.reward
         obs = self.features.transform_obs(
-            self.pathing.ground_grid, pos_of_squad, attack_target, rally_point
+            self.pathing.ground_grid,
+            self.pathing.effects_grid,
+            pos_of_squad,
+            attack_target,
+            rally_point,
         )
         spatial, entity, scalar, locations = obs
         locations = locations.to(self.device)

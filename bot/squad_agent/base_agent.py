@@ -99,11 +99,11 @@ class BaseAgent(metaclass=ABCMeta):
             self.fig, self.axes = plt.subplots(2, 3)
             self.PLOT_TITLES = [
                 "Enemy Influence",
+                "Effects",
                 "Height",
                 "Creep",
                 "Visibility",
                 "Scatter (mean)",
-                "PlaceHolder",
             ]
 
     @property
@@ -199,11 +199,11 @@ class BaseAgent(metaclass=ABCMeta):
 
         images: list[torch.Tensor] = [
             spatial[0],  # influence
-            spatial[1],  # height
-            spatial[2],  # creep
-            spatial[4],  # visibility
-            spatial[5:].mean(0),  # scatter connections
-            spatial[5],  # placeholder
+            spatial[1],  # effects
+            spatial[2],  # height
+            spatial[3],  # creep
+            spatial[5],  # visibility
+            spatial[6:].mean(0),  # scatter connections
         ]
         index: int = 0
         # A loop to access all subplots

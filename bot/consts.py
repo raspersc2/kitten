@@ -1,6 +1,8 @@
 from enum import Enum, auto
 from typing import Set, Dict
 
+from sc2.ids.effect_id import EffectId
+
 from sc2.ids.unit_typeid import UnitTypeId
 
 TOWNHALL_TYPES: set[UnitTypeId] = {
@@ -160,6 +162,51 @@ ALL_STRUCTURES: Set[UnitTypeId] = {
     UnitTypeId.TWILIGHTCOUNCIL,
     UnitTypeId.ULTRALISKCAVERN,
     UnitTypeId.WARPGATE,
+}
+
+EFFECT_COSTS: Dict[EffectId, Dict] = {
+    EffectId.BLINDINGCLOUDCP: {
+        "AirCost": 0,
+        "GroundCost": 0.5,
+        "AirRange": 0,
+        "GroundRange": 3.5,
+    },
+    EffectId.LIBERATORTARGETMORPHPERSISTENT: {
+        "AirCost": 0,
+        "GroundCost": 500,
+        "AirRange": 0,
+        "GroundRange": 6,
+    },
+    EffectId.LIBERATORTARGETMORPHDELAYPERSISTENT: {
+        "AirCost": 0,
+        "GroundCost": 5.0,
+        "AirRange": 0,
+        "GroundRange": 6,
+    },
+    EffectId.LURKERMP: {
+        "AirCost": 0,
+        "GroundCost": 2.5,
+        "AirRange": 0,
+        "GroundRange": 1,
+    },
+    EffectId.NUKEPERSISTENT: {
+        "AirCost": 5.0,
+        "GroundCost": 5.0,
+        "AirRange": 8,
+        "GroundRange": 8,
+    },
+    EffectId.PSISTORMPERSISTENT: {
+        "AirCost": 5.0,
+        "GroundCost": 5.0,
+        "AirRange": 3.5,
+        "GroundRange": 3.5,
+    },
+    EffectId.RAVAGERCORROSIVEBILECP: {
+        "AirCost": 5.0,
+        "GroundCost": 5.0,
+        "AirRange": 3.0,
+        "GroundRange": 3.0,
+    },
 }
 
 INFLUENCE_COSTS: Dict[UnitTypeId, Dict] = {
