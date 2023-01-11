@@ -143,7 +143,9 @@ class UnitSquads:
                         self.attack_target,
                         self.rally_point,
                     )
-                    logger.info(f"Chosen action: {SQUAD_ACTIONS[action]}")
+                    logger.info(
+                        f"{self.ai.time_formatted} Chosen action: {SQUAD_ACTIONS[action]}"
+                    )
                     action_type: SquadActionType = SQUAD_ACTIONS[action]
                     if action_type in self.action_to_arguments:
                         squad.update_action(*self.action_to_arguments[action_type]())
@@ -317,12 +319,7 @@ class UnitSquads:
             )
             # squads may contain no more units (we don't clear up the tags of dead units)
             if not squad_units:
-                squads_to_remove.append(
-                    {
-                        "id": squad_id,
-                        "role": self.squads_dict[squad_id][self.SQUAD_OBJECT].role,
-                    }
-                )
+                squads_to_remove.append({"id": squad_id})
                 continue
 
             self.squads_dict[squad_id][self.SQUAD_OBJECT].set_squad_units(squad_units)

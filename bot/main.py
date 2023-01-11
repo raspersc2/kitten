@@ -1,30 +1,26 @@
-from typing import Optional, List, Dict
+from typing import Optional, Dict
 
-from sc2.position import Point3
-
-from sc2.data import Result
-from scipy.spatial import KDTree
-
-from bot.botai_ext import BotAIExt
-from bot.modules.pathing import Pathing
-from bot.squad_agent.base_agent import BaseAgent
-from sc2.ids.ability_id import AbilityId
-from sc2.ids.unit_typeid import UnitTypeId
-from sc2.unit import Unit
 import yaml
 
+from MapAnalyzer.MapData import MapData
+from bot.botai_ext import BotAIExt
 from bot.consts import AgentClass, ConfigSettings
 from bot.modules.macro import Macro
 from bot.modules.map_scouter import MapScouter
-from bot.state import State
+from bot.modules.pathing import Pathing
 from bot.modules.terrain import Terrain
 from bot.modules.unit_roles import UnitRoles
-from bot.unit_squads import UnitSquads
 from bot.modules.workers import WorkersManager
-
-from bot.squad_agent.random_agent import RandomAgent
+from bot.squad_agent.base_agent import BaseAgent
 from bot.squad_agent.offline_agent import OfflineAgent
-from MapAnalyzer.MapData import MapData
+from bot.squad_agent.random_agent import RandomAgent
+from bot.state import State
+from bot.unit_squads import UnitSquads
+from sc2.data import Result
+from sc2.ids.ability_id import AbilityId
+from sc2.ids.unit_typeid import UnitTypeId
+from sc2.position import Point3
+from sc2.unit import Unit
 
 
 class Kitten(BotAIExt):

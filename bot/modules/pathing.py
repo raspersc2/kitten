@@ -1,12 +1,12 @@
 from typing import Optional, Dict, List
 
 import numpy as np
-from sc2.ids.effect_id import EffectId
 from scipy import spatial
 
 from MapAnalyzer import MapData
 from bot.consts import ALL_STRUCTURES, INFLUENCE_COSTS, EFFECT_COSTS
 from sc2.bot_ai import BotAI
+from sc2.ids.effect_id import EffectId
 from sc2.position import Point2
 from sc2.unit import Unit
 from sc2.units import Units

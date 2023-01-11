@@ -77,9 +77,9 @@ class Macro:
         self._produce_workers()
         await self._build_addons()
         self._produce_army()
-        await self._build_barracks(available_scvs)
         await self._build_factory(available_scvs)
         await self._build_starport(available_scvs)
+        await self._build_barracks(available_scvs)
 
         # 2 townhalls at all times
         if (
@@ -199,12 +199,16 @@ class Macro:
 
     async def _build_barracks(self, available_scvs: Units) -> None:
         max_barracks: int = 2 if len(self.ai.townhalls) <= 1 else 8
+        if self.ai.minerals > 500:
+            max_barracks = 9
+
         rax: Units = self.state.barracks
-        if (
-            self.ai.tech_requirement_progress(UnitTypeId.BARRACKS) != 1
-            or len(rax) >= max_barracks
-            or not available_scvs
-            or not self.ai.can_afford(UnitTypeId.BARRACKS)
+        if self._dont_build(
+            available_scvs,
+            rax,
+            UnitTypeId.BARRACKS,
+            num_existing=max_barracks,
+            max_pending=5,
         ):
             return
 
@@ -324,17 +328,15 @@ class Macro:
 
     async def _build_factory(self, available_scvs: Units) -> None:
         factories: Units = self.state.factories
-        if f := factories.not_flying:
-            f[0](AbilityId.LIFT_FACTORY)
-            self.unit_roles.assign_role(f[0].tag, UnitRoleTypes.ATTACKING)
+        # if f := factories.not_flying:
+        #     f[0](AbilityId.LIFT_FACTORY)
+        #     self.unit_roles.assign_role(f[0].tag, UnitRoleTypes.ATTACKING)
 
-        if (
-            self.ai.tech_requirement_progress(UnitTypeId.FACTORY) != 1
-            or len(factories) >= 1
-            or not available_scvs
-            or not self.ai.can_afford(UnitTypeId.FACTORY)
-            or self.ai.already_pending(UnitTypeId.FACTORY)
-        ):
+        # we only care about factories for the starport
+        if self.state.starports:
+            return
+
+        if self._dont_build(available_scvs, factories, UnitTypeId.FACTORY):
             return
 
         await self._build_structure(
@@ -343,15 +345,25 @@ class Macro:
 
     async def _build_starport(self, available_scvs: Units) -> None:
         ports: Units = self.state.starports
-        if (
-            self.ai.tech_requirement_progress(UnitTypeId.STARPORT) != 1
-            or len(ports) >= 1
-            or not available_scvs
-            or not self.ai.can_afford(UnitTypeId.STARPORT)
-            or self.ai.already_pending(UnitTypeId.STARPORT)
-        ):
+        if self._dont_build(available_scvs, ports, UnitTypeId.STARPORT):
             return
 
         await self._build_structure(
             UnitTypeId.STARPORT, self.state.main_build_area, available_scvs
+        )
+
+    def _dont_build(
+        self,
+        available_scvs: Units,
+        structures: Units,
+        structure_type: UnitTypeId,
+        num_existing: int = 1,
+        max_pending: int = 1,
+    ) -> bool:
+        return (
+            self.ai.tech_requirement_progress(structure_type) != 1
+            or len(structures) >= num_existing
+            or not available_scvs
+            or not self.ai.can_afford(structure_type)
+            or self.ai.already_pending(structure_type) >= max_pending
         )
