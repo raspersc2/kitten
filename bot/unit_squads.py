@@ -3,7 +3,7 @@ Create and manage unit squad bookkeeping.
 Note: squad actions are carried out in `unit_squad.py`
 """
 import uuid
-from typing import Set, Dict, Any, List, Optional
+from typing import Set, Dict, Any, List, Optional, Callable
 
 from loguru import logger
 
@@ -30,6 +30,7 @@ class UnitSquads:
         "squads_dict",
         "attack_target",
         "rally_point",
+        "action_to_arguments",
         "AGENT_FRAME_SKIP",
         "SQUAD_OBJECT",
         "SQUAD_RADIUS",
@@ -53,6 +54,34 @@ class UnitSquads:
 
         self.attack_target: Optional[Point2] = None
         self.rally_point: Optional[Point2] = None
+
+        self.action_to_arguments: dict[SquadActionType, Callable] = {
+            SquadActionType.ATTACK_STUTTER_BACK: lambda: (
+                AbilityId.ATTACK,
+                self.attack_target,
+                False,
+            ),
+            SquadActionType.ATTACK_STUTTER_FORWARD: lambda: (
+                AbilityId.ATTACK,
+                self.attack_target,
+                True,
+            ),
+            SquadActionType.MOVE_TO_MAIN_OFFENSIVE_THREAT: lambda: (
+                AbilityId.MOVE,
+                self.attack_target,
+                False,
+            ),
+            SquadActionType.HOLD_POSITION: lambda: (
+                AbilityId.HOLDPOSITION,
+                self.attack_target,
+                False,
+            ),
+            SquadActionType.RETREAT_TO_RALLY_POINT: lambda: (
+                AbilityId.MOVE,
+                self.rally_point,
+                False,
+            ),
+        }
 
         # How often we get a new squad action (22.4 FPS)
         self.AGENT_FRAME_SKIP: int = 20
@@ -116,18 +145,9 @@ class UnitSquads:
                     )
                     logger.info(f"Chosen action: {SQUAD_ACTIONS[action]}")
                     action_type: SquadActionType = SQUAD_ACTIONS[action]
-                    if action_type == SquadActionType.ATTACK_STUTTER_BACK:
-                        squad.update_action(AbilityId.ATTACK, self.attack_target)
-                    elif action_type == SquadActionType.ATTACK_STUTTER_FORWARD:
-                        squad.update_action(AbilityId.ATTACK, self.attack_target, True)
-                    elif action_type == SquadActionType.MOVE_TO_MAIN_OFFENSIVE_THREAT:
-                        squad.update_action(AbilityId.MOVE, self.attack_target)
-                    elif action_type == SquadActionType.HOLD_POSITION:
-                        squad.update_action(AbilityId.HOLDPOSITION, self.attack_target)
-                    elif action_type == SquadActionType.RETREAT_TO_RALLY_POINT:
-                        squad.update_action(AbilityId.MOVE, self.rally_point)
-                    elif action_type == SquadActionType.HOLD_POSITION:
-                        squad.update_action(AbilityId.HOLDPOSITION, self.rally_point)
+                    if action_type in self.action_to_arguments:
+                        squad.update_action(*self.action_to_arguments[action_type]())
+                    # Stim maintains previous action, we
                     elif action_type == SquadActionType.STIM:
                         squad.set_stim_status(True)
             else:

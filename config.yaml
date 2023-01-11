@@ -2,7 +2,7 @@ DataDirectory: "./data"
 Debug: True
 GameStep: 4
 # Visualize processed spatial information being fed to the spatial encoder
-VisualizeSpatialFeatures: True
+VisualizeSpatialFeatures: False
 SquadAgent:
   AgentClass: "OfflineAgent"
   CheckPointName: "checkpoint.pt"
