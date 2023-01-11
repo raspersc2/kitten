@@ -284,6 +284,7 @@ class WorkersManager:
         }
         for worker in workers:
             worker_tag: int = worker.tag
+            # prevent spam clicking scv on patch to reduce APM
             if worker_tag in self.locked_action_tags:
                 if self.ai.time > self.locked_action_tags[worker_tag] + 0.4:
                     self.locked_action_tags.pop(worker_tag)

@@ -36,10 +36,9 @@ SCALAR_SHAPE: tuple[int, int] = (1, 8)
 class PPOTrainer:
     def __init__(self, device: str = "cuda"):
         self.config: Dict = dict()
-        self.CONFIG_FILE = "../../../config.yaml"
 
-        cwd = Path.cwd()
-        # root_dir = cwd.parent.parent.parent
+        # need relative imports for this to work in the context of the aiarena docker
+        self.CONFIG_FILE = "../../../config.yaml"
         root_dir = Path(__file__).parent / "../../../"
         config_path = Path(__file__).parent / self.CONFIG_FILE
         with open(config_path, "r") as config_file:
