@@ -212,6 +212,9 @@ class UnitSquads:
         """
         Remove a unit tag from any data structures
         """
+        if squad_id not in self.squads_dict:
+            return
+
         if tag in self.assigned_unit_tags:
             self.assigned_unit_tags.remove(tag)
 
