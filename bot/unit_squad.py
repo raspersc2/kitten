@@ -127,8 +127,8 @@ class UnitSquad:
         close_enemy: Dict[int, Units] = self.ai.enemies_in_range(self.squad_units, 15.0)
         should_stutter: bool = self.should_stutter(close_enemy)
         sample_unit: Unit = self.squad_units[0]
-
-        # all units weapons are ready, fire!
+        # all units weapons are ready, a-move to current action position
+        # TODO: Add some target fire, keeping in mind APM?
         if not should_stutter and not sample_unit.is_attacking:
             self.stuttering = False
             await self.ai.give_units_same_order(
@@ -136,7 +136,8 @@ class UnitSquad:
                 squad_tags,
                 self.current_action_position,
             )
-        # else move depending on the agent's action type
+
+        # else move command depending on the agent's action type
         elif should_stutter and not self.stuttering:
             # only call this once till weapons are ready again, so action isn't spammed
             self.stuttering = True
@@ -155,21 +156,24 @@ class UnitSquad:
     async def _do_squad_move_action(
         self, squad_tags: Set[int], pathing: Pathing
     ) -> None:
-        if self.squad_position.distance_to(self.current_action_position) < 2.0:
+        if self.squad_position.distance_to(self.current_action_position) < 3.0:
             return
 
         sample_unit: Unit = self.squad_units[0]
+        order_target: Optional[int, Point2] = sample_unit.order_target
 
         pos: Point2 = pathing.find_path_next_point(
             start=self.squad_position,
             target=self.current_action_position,
             grid=pathing.ground_grid,
-            sensitivity=5,
+            sensitivity=6,
         )
-        order_target: Optional[int, Point2] = sample_unit.order_target
+
         if (
             order_target
             and isinstance(order_target, Point2)
-            and order_target.distance_to(pos) > 1.0
+            and sample_unit.distance_to(pos) < 1.0
         ):
-            await self.ai.give_units_same_order(self.current_action, squad_tags, pos)
+            return
+
+        await self.ai.give_units_same_order(self.current_action, squad_tags, pos)
