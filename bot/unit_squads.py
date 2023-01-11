@@ -306,6 +306,9 @@ class UnitSquads:
                 continue
 
             self.squads_dict[squad_id][self.SQUAD_OBJECT].set_squad_units(squad_units)
+            self.squads_dict[squad_id][
+                self.SQUAD_OBJECT
+            ].squad_position = squad_units.center
 
         # remove any squads with empty units
         for squad_to_remove in squads_to_remove:
