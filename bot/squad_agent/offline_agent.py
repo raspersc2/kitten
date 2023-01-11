@@ -171,6 +171,8 @@ class OfflineAgent(BaseAgent):
                 self.current_lstm_state,
                 self.dones,
             )
+            if self.visualize_spatial_features:
+                self._plot_spatial_features(processed_spatial[0])
             self.action_distribution[action] += 1
 
             step: int = self.current_rollout_step

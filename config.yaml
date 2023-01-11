@@ -1,11 +1,11 @@
 DataDirectory: "./data"
 Debug: True
 GameStep: 4
-VisualizeSpatialFeatures: False
+# Visualize processed spatial information being fed to the spatial encoder
+VisualizeSpatialFeatures: True
 SquadAgent:
   AgentClass: "OfflineAgent"
   CheckPointName: "checkpoint.pt"
-  # Keep on True for OfflineAgent
   InferenceMode: False
   NumRolloutSteps: 64
   # Offline agent stores states, actions, rewards etc. here

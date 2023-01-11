@@ -100,11 +100,8 @@ class Features:
 
         entity, entities_type, locations = self._process_entity_info()
         spatial = self._process_spatial_info(ground_grid)
-        if self.visualize_spatial_features:
-            self._plot_spatial_features(spatial)
-
         scalar: torch.Tensor = self._process_scalar_info(
-            self.ai.state.observation, pos_of_squad, attack_target, rally_point
+            pos_of_squad, attack_target, rally_point
         )
 
         return spatial, entity, scalar, locations
@@ -255,7 +252,6 @@ class Features:
 
     def _process_scalar_info(
         self,
-        obs,
         pos_of_squad: Point2,
         attack_target: Point2,
         rally_point: Point2,
@@ -265,7 +261,7 @@ class Features:
         """
         scalars = [
             pos_of_squad.x,
-            pos_of_squad.y,
+            self.map_size_y - pos_of_squad.y,
             self.ai.structures.amount,
             self.ai.enemy_structures.amount,
             attack_target.x,
@@ -278,47 +274,3 @@ class Features:
         scalars = scalars.to(torch.float32)
         scalars = torch.unsqueeze(scalars, 0)
         return scalars
-
-    def _plot_spatial_features(self, spatial: torch.Tensor) -> None:
-        import matplotlib.pyplot as plt
-        from IPython.display import clear_output
-
-        rows: int = 3
-        cols: int = 2
-
-        plt.clf()
-
-        self.fig.add_subplot(rows, cols, 1)
-        # showing image
-        plt.imshow(spatial[0].rot90())
-        plt.axis("off")
-        plt.title("Enemy influence")
-
-        # Adds a subplot at the 2nd position
-        self.fig.add_subplot(rows, cols, 2)
-
-        # showing image
-        plt.imshow(spatial[1].rot90())
-        plt.axis("off")
-        plt.title("Height")
-
-        # Adds a subplot at the 3rd position
-        self.fig.add_subplot(rows, cols, 3)
-
-        # showing image
-        plt.imshow(spatial[2].rot90())
-        plt.axis("off")
-        plt.title("Creep")
-
-        # note creep is one hot encoded, so spatial [3] is creep too
-
-        # Adds a subplot at the 4th position
-        self.fig.add_subplot(rows, cols, 4)
-
-        plt.imshow(spatial[4].rot90())
-        plt.axis("off")
-        plt.title("visibility")
-
-        self.fig.canvas.draw()
-        plt.pause(0.00000001)
-        clear_output(wait=True)

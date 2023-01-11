@@ -39,6 +39,10 @@ class BaseAgent(metaclass=ABCMeta):
         "CHECKPOINT_PATH",
         "num_actions",
         "training_active",
+        "axes",
+        "fig",
+        "visualize_spatial_features",
+        "PLOT_TITLES",
     )
 
     def __init__(self, ai: BotAI, config: Dict, device: str = "cuda"):
@@ -77,6 +81,30 @@ class BaseAgent(metaclass=ABCMeta):
             ConfigSettings.INFERENCE_MODE
         ]
         logger.info(f"Training active: {self.training_active}")
+
+        self.axes = None
+        self.fig = None
+        self.visualize_spatial_features: bool = config[
+            ConfigSettings.VISUALIZE_SPATIAL_FEATURES
+        ]
+
+        self.PLOT_TITLES: list[str] = []
+
+        if self.visualize_spatial_features:
+            import matplotlib.pyplot as plt
+            import matplotlib
+
+            matplotlib.use("TkAgg")
+            # self.fig = plt.figure(figsize=(10, 7))
+            self.fig, self.axes = plt.subplots(2, 3)
+            self.PLOT_TITLES = [
+                "Enemy Influence",
+                "Height",
+                "Creep",
+                "Visibility",
+                "Scatter (mean)",
+                "PlaceHolder",
+            ]
 
     @property
     def reward(self) -> float:
@@ -164,3 +192,37 @@ class BaseAgent(metaclass=ABCMeta):
         Convert Result enum into an integer
         """
         return 2 if result == Result.Victory else (0 if result == Result.Defeat else 1)
+
+    def _plot_spatial_features(self, spatial: torch.Tensor) -> None:
+        import matplotlib.pyplot as plt
+        from IPython.display import clear_output
+
+        images: list[torch.Tensor] = [
+            spatial[0],  # influence
+            spatial[1],  # height
+            spatial[2],  # creep
+            spatial[4],  # visibility
+            spatial[5:].mean(0),  # scatter connections
+            spatial[5],  # placeholder
+        ]
+        index: int = 0
+        # A loop to access all subplots
+        for i in range(2):
+            for j in range(3):
+                # assign the current subplot to the loop variable
+                ax = self.axes[i, j]
+                # clear the last figure
+                ax.clear()
+                # use the loop variable to assign title
+                ax.set_title(self.PLOT_TITLES[index])
+
+                # use the loop variable to assign the image
+                ax.imshow(images[index])
+
+                # remove axis
+                ax.axis("off")
+
+                index += 1
+
+        plt.pause(0.0000000001)
+        clear_output(wait=True)
