@@ -61,7 +61,9 @@ class Macro:
 
         if building_scvs := self.unit_roles.get_units_from_role(
             UnitRoleTypes.BUILDING
-        ).filter(lambda u: u.is_idle):
+        ).filter(
+            lambda u: len(u.orders) == 0 or u.is_gathering or u.is_carrying_resource
+        ):
             for scv in building_scvs:
                 self.unit_roles.assign_role(scv.tag, UnitRoleTypes.GATHERING)
 
@@ -232,9 +234,12 @@ class Macro:
             ) == 0 and self.ai.can_afford(UpgradeId.STIMPACK):
                 self.ai.research(UpgradeId.STIMPACK)
                 return
-            if self.ai.already_pending_upgrade(
-                UpgradeId.PUNISHERGRENADES
-            ) == 0 and self.ai.can_afford(UpgradeId.PUNISHERGRENADES):
+            if (
+                self.ai.already_pending_upgrade(UpgradeId.PUNISHERGRENADES) == 0
+                and self.ai.can_afford(UpgradeId.PUNISHERGRENADES)
+                and UpgradeId.STIMPACK in self.ai.state.upgrades
+                and UpgradeId.SHIELDWALL in self.ai.state.upgrades
+            ):
                 self.ai.research(UpgradeId.PUNISHERGRENADES)
                 return
 
@@ -263,7 +268,7 @@ class Macro:
         max_gas: int = (
             2
             if len(self.state.barracks) >= 5
-            else (1 if len(self.state.barracks) >= 3 else 0)
+            else (1 if len(self.ai.townhalls) >= 2 else 0)
         )
         current_gas_num = (
             self.ai.already_pending(UnitTypeId.REFINERY) + self.ai.gas_buildings.amount
