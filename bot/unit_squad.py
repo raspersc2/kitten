@@ -21,6 +21,8 @@ class UnitSquad:
         "stuttering",
         "action_updated_this_step",
         "stim_next_step",
+        "stim_locked_till",
+        "STIM_DURATION",
     )
 
     def __init__(self, ai: BotAIExt, squad_id: str, squad_units: Units):
@@ -38,8 +40,18 @@ class UnitSquad:
 
         self.action_updated_this_step: bool = False
         self.stim_next_step: bool = False
+        self.stim_locked_till: float = 0.0
+        self.STIM_DURATION: float = 11.0
 
     def set_stim_status(self, status: bool) -> None:
+        # Only one stim per self.STIM_DURATION seconds
+        if status and (
+            self.ai.time < self.stim_locked_till
+            or UpgradeId.STIMPACK not in self.ai.state.upgrades
+        ):
+            self.stim_next_step = False
+            return
+
         self.stim_next_step = status
 
     def set_squad_units(self, units: Units) -> None:
@@ -61,8 +73,9 @@ class UnitSquad:
         if not main_squad:
             await self._do_scripted_squad_action(squad_tags)
         else:
-            if self.stim_next_step and UpgradeId.STIMPACK in self.ai.state.upgrades:
+            if self.stim_next_step:
                 self.stim_next_step = False
+                self.stim_locked_till = self.ai.time + self.STIM_DURATION
                 await self.ai.give_units_same_order(AbilityId.EFFECT_STIM, squad_tags)
             else:
                 if self.current_action == AbilityId.HOLDPOSITION:
@@ -91,12 +104,12 @@ class UnitSquad:
         if (
             target
             and isinstance(target, Point2)
-            and target.distance_to(self.current_action_position) < 10.0
+            and target.distance_to(self.current_action_position) < 8.0
         ):
             return
 
         await self.ai.give_units_same_order(
-            self.current_action, squad_tags, self.current_action_position
+            AbilityId.ATTACK, squad_tags, self.current_action_position
         )
 
     def should_stutter(self, close_enemy: Dict[int, Units]) -> bool:
@@ -132,7 +145,7 @@ class UnitSquad:
         if not should_stutter and not sample_unit.is_attacking:
             self.stuttering = False
             await self.ai.give_units_same_order(
-                self.current_action,
+                AbilityId.ATTACK,
                 squad_tags,
                 self.current_action_position,
             )
@@ -149,7 +162,7 @@ class UnitSquad:
                     start=self.squad_position,
                     target=self.ai.start_location,
                     grid=pathing.ground_grid,
-                    sensitivity=12,
+                    sensitivity=8,
                 )
             await self.ai.give_units_same_order(AbilityId.MOVE, squad_tags, pos)
 
@@ -168,11 +181,19 @@ class UnitSquad:
             grid=pathing.ground_grid,
             sensitivity=6,
         )
-
+        # sample unit is already close to the calculated position
         if (
             order_target
             and isinstance(order_target, Point2)
-            and sample_unit.distance_to(pos) < 1.0
+            and sample_unit.distance_to(pos) < 2.5
+        ):
+            return
+
+        # the pos we calculated is not that different to previous target
+        if (
+            order_target
+            and isinstance(order_target, Point2)
+            and order_target.distance_to(pos) < 4.5
         ):
             return
 
