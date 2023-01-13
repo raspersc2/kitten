@@ -4,7 +4,7 @@ import yaml
 
 from MapAnalyzer.MapData import MapData
 from bot.botai_ext import BotAIExt
-from bot.consts import AgentClass, ConfigSettings
+from bot.consts import AgentClass, ConfigSettings, UnitRoleTypes
 from bot.modules.macro import Macro
 from bot.modules.map_scouter import MapScouter
 from bot.modules.pathing import Pathing
@@ -57,7 +57,9 @@ class Kitten(BotAIExt):
         self.terrain: Terrain = Terrain(self)
         self.map_scouter: MapScouter = MapScouter(self, self.unit_roles, self.terrain)
 
-        self.workers_manager: WorkersManager = WorkersManager(self, self.unit_roles)
+        self.workers_manager: WorkersManager = WorkersManager(
+            self, self.unit_roles, self.terrain
+        )
         self.sent_chat: bool = False
 
     async def on_start(self) -> None:
@@ -85,10 +87,8 @@ class Kitten(BotAIExt):
 
         await self.terrain.initialize()
         await self.map_scouter.initialize()
-
-        for worker in self.units(UnitTypeId.SCV):
-            worker.gather(self.mineral_field.closest_to(worker))
-            self.unit_roles.catch_unit(worker)
+        for worker in self.workers:
+            self.unit_roles.assign_role(worker.tag, UnitRoleTypes.GATHERING)
 
     async def on_step(self, iteration: int) -> None:
         # unit_position_list: List[List[float]] = [
@@ -143,6 +143,8 @@ class Kitten(BotAIExt):
         self.agent.on_unit_destroyed(unit_tag)
         self.unit_squads.remove_tag(unit_tag)
         self.pathing.remove_unit_tag(unit_tag)
+        self.workers_manager.remove_worker_from_mineral(unit_tag)
+        self.workers_manager.remove_worker_from_vespene(unit_tag)
 
     async def on_unit_took_damage(self, unit: Unit, amount_damage_taken: float) -> None:
         if not unit.is_structure:

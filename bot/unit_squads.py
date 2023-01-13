@@ -357,7 +357,7 @@ class UnitSquads:
                 self.attack_target = center_mass
 
         # then anything else
-        elif enemy_structures := self.ai.enemy_structures:
+        if enemy_structures := self.ai.enemy_structures:
             self.attack_target = enemy_structures.closest_to(
                 self.ai.game_info.map_center
             ).position

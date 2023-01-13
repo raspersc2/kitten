@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Dict, Set, List, DefaultDict, Optional
 
 from bot.consts import UnitRoleTypes, WORKERS_DEFEND_AGAINST
+from bot.modules.terrain import Terrain
 from bot.modules.unit_roles import UnitRoles
 from bot.state import State
 from sc2.bot_ai import BotAI
@@ -16,6 +17,7 @@ class WorkersManager:
     __slots__ = (
         "ai",
         "unit_roles",
+        "terrain",
         "workers_per_gas",
         "worker_to_mineral_patch_dict",
         "mineral_patch_to_list_of_workers",
@@ -30,9 +32,10 @@ class WorkersManager:
         "locked_action_tags",
     )
 
-    def __init__(self, ai: BotAI, unit_roles: UnitRoles) -> None:
+    def __init__(self, ai: BotAI, unit_roles: UnitRoles, terrain: Terrain) -> None:
         self.ai: BotAI = ai
         self.unit_roles: UnitRoles = unit_roles
+        self.terrain: Terrain = terrain
         self.workers_per_gas: int = 3
         self.worker_to_mineral_patch_dict: Dict[int, int] = {}
         self.mineral_patch_to_list_of_workers: Dict[int, Set[int]] = {}
@@ -77,7 +80,7 @@ class WorkersManager:
     def update(self, state: State, iteration: int) -> None:
         gatherers: Units = self.unit_roles.get_units_from_role(UnitRoleTypes.GATHERING)
         self._assign_workers(gatherers)
-        if iteration % 4 == 0:
+        if iteration % 4 == 0 or iteration == 0:
             self._collect_resources(gatherers)
 
         for oc in state.orbitals.filter(lambda x: x.energy >= 50):
@@ -88,25 +91,22 @@ class WorkersManager:
 
         self._handle_worker_rush()
 
-    def select_worker(self, target_position: Point2) -> Optional[Unit]:
+    def select_worker(
+        self, target_position: Point2, force: bool = False
+    ) -> Optional[Unit]:
         """
         Note: Make sure to change the worker role once selected. Otherwise, it is selected to mine again
         This doesn't select workers from geysers, so make sure to remove workers from gas if low on workers
         """
+
         workers: Units = self.ai.workers.tags_in(self.worker_to_mineral_patch_dict)
         # there is a chance we have no workers
         if not workers:
             return
 
-        # if there are workers not assigned to mine (probably long distance mining), choose one of those and return
-        unassigned_workers: Units = workers.tags_not_in(
-            list(self.worker_to_mineral_patch_dict) + list(self.worker_to_geyser_dict)
-        )
-        if unassigned_workers:
-            return unassigned_workers.closest_to(target_position)
-
         if available_workers := workers.filter(
             lambda w: w.tag in self.worker_to_mineral_patch_dict
+            and w.tag not in self.worker_to_geyser_dict
             and not w.is_carrying_resource
         ):
             # find townhalls with plenty of mineral patches
@@ -118,31 +118,16 @@ class WorkersManager:
             if not townhalls:
                 return available_workers.closest_to(target_position)
 
-            # go through townhalls, we loop through the min fields by distance to townhall
-            # that way there is a good chance we pick a worker at a far mineral patch
-            for townhall in townhalls:
-                minerals_sorted_by_distance: Units = self.ai.mineral_field.closer_than(
-                    10, townhall
-                ).sorted_by_distance_to(townhall)
-                for mineral in reversed(minerals_sorted_by_distance):
-                    # we have record of the patch, with some worker tags saved
-                    if mineral.tag in self.mineral_patch_to_list_of_workers:
-                        # try to get a worker at this patch that is not carrying resources
-                        if _workers := available_workers.filter(
-                            lambda w: w.tag
-                            in self.mineral_patch_to_list_of_workers[mineral.tag]
-                            and not w.is_carrying_resource
-                            and not w.is_collecting
-                        ):
-                            worker: Unit = _workers.first
-                            # make sure to remove worker, so a new one can be assigned to mine
-                            self.remove_worker_from_mineral(worker.tag)
-                            return worker
+            if _workers := available_workers.filter(
+                lambda w: not w.is_carrying_resource
+            ):
+                worker: Unit = _workers.closest_to(target_position)
+                # make sure to remove worker, so a new one can be assigned to mine
+                self.remove_worker_from_mineral(worker.tag)
+                return worker
 
-            # somehow got here without finding a worker, anyone will do
-            worker: Unit = available_workers.closest_to(target_position)
-            self.remove_worker_from_mineral(worker.tag)
-            return worker
+            if available_workers and force:
+                return available_workers.closest_to(target_position)
 
     def _assign_workers(self, workers: Units) -> None:
         """
@@ -157,15 +142,14 @@ class WorkersManager:
         if self.ai.gas_buildings:
             self._assign_worker_to_gas_buildings(self.ai.gas_buildings)
 
-        unassigned_workers: Units = workers.filter(
-            lambda u: u.tag not in self.worker_to_geyser_dict
-            and u.tag not in self.worker_to_mineral_patch_dict
-        )
-
         if self.available_minerals:
-            self._assign_workers_to_mineral_patches(
-                self.available_minerals, unassigned_workers
-            )
+            if unassigned_workers := workers.filter(
+                lambda u: u.tag not in self.worker_to_geyser_dict
+                and u.tag not in self.worker_to_mineral_patch_dict
+            ):
+                self._assign_workers_to_mineral_patches(
+                    self.available_minerals, unassigned_workers
+                )
 
     def _assign_worker_to_gas_buildings(self, gas_buildings: Units) -> None:
         """
@@ -173,13 +157,11 @@ class WorkersManager:
         @param gas_buildings:
         @return:
         """
-        if not self.ai.townhalls:
-            return
-
         for gas in gas_buildings.ready:
             # don't assign if there is no townhall nearby
             if not self.ai.townhalls.closer_than(12, gas):
                 continue
+
             # too many workers assigned, this can happen if we want to pull workers off gas
             if (
                 len(self.geyser_to_list_of_workers.get(gas.tag, []))
@@ -189,7 +171,7 @@ class WorkersManager:
                     self.geyser_to_list_of_workers[gas.tag]
                 )
                 if workers_on_gas:
-                    self._remove_worker_from_vespene(workers_on_gas.first.tag)
+                    self.remove_worker_from_vespene(workers_on_gas.first.tag)
                 continue
             # already perfect amount of workers assigned
             if (
@@ -199,7 +181,7 @@ class WorkersManager:
                 continue
 
             # Assign worker closest to the gas building
-            worker: Optional[Unit] = self.select_worker(gas.position)
+            worker: Optional[Unit] = self.select_worker(gas.position, force=True)
 
             if not worker or worker.tag in self.geyser_to_list_of_workers:
                 continue
@@ -286,17 +268,26 @@ class WorkersManager:
             worker_tag: int = worker.tag
             # prevent spam clicking scv on patch to reduce APM
             if worker_tag in self.locked_action_tags:
-                if self.ai.time > self.locked_action_tags[worker_tag] + 0.4:
+                if self.ai.time > self.locked_action_tags[worker_tag] + 0.5:
                     self.locked_action_tags.pop(worker_tag)
                 continue
-
-            if worker_tag in self.worker_to_mineral_patch_dict:
+            # moved worker from gas
+            if worker.is_carrying_vespene and not worker.is_returning:
+                worker.return_resource()
+            elif worker_tag in self.worker_to_mineral_patch_dict:
                 mineral_tag: int = self.worker_to_mineral_patch_dict[worker_tag]
                 mineral: Optional[Unit] = minerals.get(mineral_tag, None)
                 if mineral is None:
                     # Mined out or no vision? Remove it
                     self._remove_mineral_field(mineral_tag)
                     continue
+
+                if worker.is_idle or (
+                    worker.distance_to(mineral) > 9.0
+                    and worker.order_target
+                    and worker.order_target != mineral
+                ):
+                    worker.gather(mineral)
 
                 if (
                     not worker.is_carrying_minerals
@@ -321,18 +312,29 @@ class WorkersManager:
                     worker.gather(gas_building)
 
             else:
-                if not worker.is_carrying_resource and not worker.is_gathering:
+                if (
+                    not worker.is_carrying_resource
+                    and not worker.is_gathering
+                    # mining somewhere we manage ourselves
+                    or (
+                        worker.order_target
+                        and worker.order_target in self.mineral_patch_to_list_of_workers
+                    )
+                ):
                     if not calculated_long_distance_mfs:
-                        self.long_distance_mfs = self.ai.mineral_field.filter(
-                            lambda mf: not self.ai.townhalls.closer_than(
-                                15.0, mf.position
+                        if self.ai.time < 240.0:
+                            self.long_distance_mfs = self.ai.mineral_field.filter(
+                                lambda mf: mf.distance_to(self.terrain.own_nat) < 15.0
                             )
-                        )
+                        else:
+                            self.long_distance_mfs = self.ai.mineral_field.filter(
+                                lambda mf: not self.ai.townhalls.closer_than(
+                                    15.0, mf.position
+                                )
+                            )
                         calculated_long_distance_mfs = True
-                    if len(self.ai.townhalls) <= 1:
-                        worker.gather(self.ai.mineral_field.closest_to(worker))
-                    else:
-                        worker.gather(self.long_distance_mfs.closest_to(worker))
+
+                    worker.gather(self.long_distance_mfs.closest_to(worker))
 
     def remove_worker_from_mineral(self, worker_tag: int) -> None:
         """
@@ -351,7 +353,7 @@ class WorkersManager:
             # using the min patch tag, we can remove from other collection
             self.mineral_patch_to_list_of_workers[min_patch_tag].remove(worker_tag)
 
-    def _remove_worker_from_vespene(self, worker_tag: int) -> None:
+    def remove_worker_from_vespene(self, worker_tag: int) -> None:
         """
         Remove worker from internal data structures.
         This happens if worker gets assigned to do something else, or removing workers from gas

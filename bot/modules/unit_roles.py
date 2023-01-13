@@ -23,7 +23,7 @@ class UnitRoles:
         }
         self.tag_to_role_dict: Dict[int, UnitRoleTypes] = {}
         self.all_assigned_tags: Set[int] = set()
-        self.WORKER_TYPES: Set[UnitTypeId] = {UnitTypeId.SCV, UnitTypeId.MULE}
+        self.WORKER_TYPES: Set[UnitTypeId] = {UnitTypeId.SCV}
 
     def assign_role(self, tag: int, role: UnitRoleTypes) -> None:
         """
@@ -42,7 +42,10 @@ class UnitRoles:
                 self.unit_role_dict[role].remove(tag)
 
     def catch_unit(self, unit: Unit) -> None:
-        if unit.type_id in self.WORKER_TYPES:
+        _type: UnitTypeId = unit.type_id
+        if _type == UnitTypeId.MULE:
+            return
+        if _type in self.WORKER_TYPES:
             self.assign_role(unit.tag, UnitRoleTypes.GATHERING)
         else:
             self.assign_role(unit.tag, UnitRoleTypes.ATTACKING)
