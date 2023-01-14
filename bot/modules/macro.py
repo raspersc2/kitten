@@ -67,6 +67,7 @@ class Macro:
         await self._build_factory()
         await self._build_starport()
         await self._build_barracks()
+        await self._build_bays()
 
         # catch any scvs not doing anything and send back to mining
         if building_scvs := self.unit_roles.get_units_from_role(
@@ -242,6 +243,18 @@ class Macro:
                 self.ai.research(UpgradeId.PUNISHERGRENADES)
                 return
 
+        if self.ai.already_pending_upgrade(
+            UpgradeId.TERRANINFANTRYWEAPONSLEVEL1
+        ) == 0 and self.ai.can_afford(UpgradeId.PUNISHERGRENADES):
+            self.ai.research(UpgradeId.TERRANINFANTRYWEAPONSLEVEL1)
+            return
+
+        if self.ai.already_pending_upgrade(
+            UpgradeId.TERRANINFANTRYARMORSLEVEL1
+        ) == 0 and self.ai.can_afford(UpgradeId.PUNISHERGRENADES):
+            self.ai.research(UpgradeId.TERRANINFANTRYARMORSLEVEL1)
+            return
+
     async def _build_structure(
         self,
         structure_type: UnitTypeId,
@@ -347,3 +360,12 @@ class Macro:
             or not self.ai.can_afford(structure_type)
             or self.ai.already_pending(structure_type) >= max_pending
         )
+
+    async def _build_bays(self):
+        bay_type: UnitTypeId = UnitTypeId.ENGINEERINGBAY
+        bays = self.ai.structures(bay_type)
+
+        if self._dont_build(bays, bay_type) or len(self.state.factories) < 1:
+            return
+
+        await self._build_structure(bay_type, self.state.main_build_area)
