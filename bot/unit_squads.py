@@ -86,7 +86,7 @@ class UnitSquads:
         # How often we get a new squad action (22.4 FPS)
         self.AGENT_FRAME_SKIP: int = 20
         self.SQUAD_OBJECT: str = "squad_object"
-        self.SQUAD_RADIUS: float = 15.0
+        self.SQUAD_RADIUS: float = 11.0
         self.TAGS: str = "tags"
 
     async def update(self, iteration: int, pathing: Pathing) -> None:
@@ -97,11 +97,14 @@ class UnitSquads:
         army: Units = self.unit_roles.get_units_from_role(UnitRoleTypes.ATTACKING)
 
         # handle unit squad assignment not currently in our records
-        self._squad_assignment(army.tags_not_in(self.assigned_unit_tags))
-        # handle existing squads merging / splitting
-        self._handle_existing_squads_assignment(army)
-        # update the unit collections associated with each squad
-        self._regenerate_squad_units(army)
+        if unassigned_units := army.tags_not_in(self.assigned_unit_tags):
+            self._squad_assignment(unassigned_units)
+        else:
+            # handle existing squads merging / splitting
+            self._handle_existing_squads_assignment(army)
+            # update the unit collections associated with each squad
+            self._regenerate_squad_units(army)
+
         # control the unit squads
         if len(self.squads) > 0:
             await self._handle_squads(iteration, pathing)
@@ -270,10 +273,10 @@ class UnitSquads:
                 if tag in self.assigned_unit_tags:
                     self.assigned_unit_tags.remove(tag)
 
-    def _merge_with_closest_squad(self, squad_id: str, distance: float = 15.0) -> bool:
+    def _merge_with_closest_squad(self, squad_id: str) -> bool:
         squad: UnitSquad = self.squads_dict[squad_id][self.SQUAD_OBJECT]
         closest_squad_id: str = self._closest_squad_id(
-            squad.squad_position, distance, squad_id
+            squad.squad_position, self.SQUAD_RADIUS, squad_id
         )
         if closest_squad_id != "":
             # remove this squad
