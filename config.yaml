@@ -1,11 +1,11 @@
 DataDirectory: "./data"
-Debug: True
+Debug: False
 GameStep: 4
 # Visualize processed spatial information
 # This shows exactly what will be passed through the conv layers
 VisualizeSpatialFeatures: False
 SquadAgent:
-  AgentClass: "OfflineAgent"
+  AgentClass: "PPOAgent"
   CheckPointName: "checkpoint.pt"
   InferenceMode: False
   NumRolloutSteps: 64
