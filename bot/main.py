@@ -13,6 +13,7 @@ from bot.modules.unit_roles import UnitRoles
 from bot.modules.workers import WorkersManager
 from bot.squad_agent.base_agent import BaseAgent
 from bot.squad_agent.offline_agent import OfflineAgent
+from bot.squad_agent.ppo_agent import PPOAgent
 from bot.squad_agent.random_agent import RandomAgent
 from bot.state import State
 from bot.unit_squads import UnitSquads
@@ -67,11 +68,13 @@ class Kitten(BotAIExt):
         self.pathing = Pathing(self, self.map_data)
 
         # TODO: Improve this, handle invalid options in config and don't use if/else
-        if (
-            self.config[ConfigSettings.SQUAD_AGENT][ConfigSettings.AGENT_CLASS]
-            == AgentClass.OFFLINE_AGENT
-        ):
+        agent_class: str = self.config[ConfigSettings.SQUAD_AGENT][
+            ConfigSettings.AGENT_CLASS
+        ]
+        if agent_class == AgentClass.OFFLINE_AGENT:
             self.agent = OfflineAgent(self, self.config, self.pathing)
+        elif agent_class == AgentClass.PPO_AGENT:
+            self.agent = PPOAgent(self, self.config, self.pathing)
         else:
             self.agent = RandomAgent(self, self.config, self.pathing)
 

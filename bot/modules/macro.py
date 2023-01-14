@@ -228,15 +228,15 @@ class Macro:
             ) == 0 and self.ai.can_afford(UpgradeId.SHIELDWALL):
                 self.ai.research(UpgradeId.SHIELDWALL)
                 return
-            if self.ai.already_pending_upgrade(
-                UpgradeId.STIMPACK
-            ) == 0 and self.ai.can_afford(UpgradeId.STIMPACK):
-                self.ai.research(UpgradeId.STIMPACK)
-                return
+            # if self.ai.already_pending_upgrade(
+            #     UpgradeId.STIMPACK
+            # ) == 0 and self.ai.can_afford(UpgradeId.STIMPACK):
+            #     self.ai.research(UpgradeId.STIMPACK)
+            #     return
             if (
                 self.ai.already_pending_upgrade(UpgradeId.PUNISHERGRENADES) == 0
                 and self.ai.can_afford(UpgradeId.PUNISHERGRENADES)
-                and UpgradeId.STIMPACK in self.ai.state.upgrades
+                # and UpgradeId.STIMPACK in self.ai.state.upgrades
                 and UpgradeId.SHIELDWALL in self.ai.state.upgrades
             ):
                 self.ai.research(UpgradeId.PUNISHERGRENADES)
@@ -263,11 +263,8 @@ class Macro:
 
     def _build_refineries(self):
         # 2 gas buildings
-        max_gas: int = (
-            2
-            if len(self.state.factories) >= 1
-            else (1 if len(self.ai.townhalls) >= 2 else 0)
-        )
+        num_rax: int = len(self.state.barracks)
+        max_gas: int = 2 if num_rax >= 4 else 0
         current_gas_num = (
             self.ai.already_pending(UnitTypeId.REFINERY) + self.ai.gas_buildings.amount
         )

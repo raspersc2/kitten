@@ -18,6 +18,7 @@ TOWNHALL_TYPES: set[UnitTypeId] = {
 
 class AgentClass(str, Enum):
     OFFLINE_AGENT = "OfflineAgent"
+    PPO_AGENT = "PPOAgent"
     RANDOM_AGENT = "RandomAgent"
 
 
@@ -61,7 +62,7 @@ SQUAD_ACTIONS: Dict[int, SquadActionType] = {
     2: SquadActionType.MOVE_TO_MAIN_OFFENSIVE_THREAT,
     3: SquadActionType.RETREAT_TO_RALLY_POINT,
     4: SquadActionType.HOLD_POSITION,
-    5: SquadActionType.STIM,
+    # 5: SquadActionType.STIM,
 }
 
 
