@@ -23,6 +23,7 @@ class UnitSquad:
         "stim_next_step",
         "stim_locked_till",
         "STIM_DURATION",
+        "action_locked_till",
     )
 
     def __init__(self, ai: BotAIExt, squad_id: str, squad_units: Units):
@@ -42,6 +43,8 @@ class UnitSquad:
         self.stim_next_step: bool = False
         self.stim_locked_till: float = 0.0
         self.STIM_DURATION: float = 11.0
+        # non-main squads get locked for a short period
+        self.action_locked_till: float = 0.0
 
     def set_stim_status(self, status: bool) -> None:
         # Only one stim per self.STIM_DURATION seconds
@@ -70,7 +73,7 @@ class UnitSquad:
         self, squad_tags: Set[int], pathing: Pathing, main_squad: bool = False
     ) -> None:
         # currently only main squad uses RL agent, all other squads have scripted logic
-        if not main_squad:
+        if not main_squad and self.ai.time > self.action_locked_till:
             await self._do_scripted_squad_action(squad_tags)
         else:
             if self.stim_next_step:
@@ -111,6 +114,7 @@ class UnitSquad:
         await self.ai.give_units_same_order(
             AbilityId.ATTACK, squad_tags, self.current_action_position
         )
+        self.action_locked_till = self.ai.time + 5.0
 
     def should_stutter(self, close_enemy: Dict[int, Units]) -> bool:
         avg_weapon_cooldown: float = sum(
