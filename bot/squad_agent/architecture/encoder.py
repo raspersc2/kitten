@@ -1,15 +1,15 @@
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 
 import numpy as np
 from torch import (
+    Tensor,
     arange,
     cat,
     channels_last,
+    float32,
     nan_to_num,
     nn,
-    float32,
     rot90,
-    Tensor,
     zeros,
 )
 from torchvision.transforms.functional import resize

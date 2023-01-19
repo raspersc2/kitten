@@ -1,8 +1,11 @@
-from typing import Optional, Dict
+from typing import Dict
 
-import yaml
+import yaml  # type: ignore
+from sc2.data import Result
+from sc2.ids.ability_id import AbilityId
+from sc2.position import Point3
+from sc2.unit import Unit
 
-from MapAnalyzer.MapData import MapData
 from bot.botai_ext import BotAIExt
 from bot.consts import AgentClass, ConfigSettings, UnitRoleTypes
 from bot.modules.macro import Macro
@@ -17,11 +20,7 @@ from bot.squad_agent.ppo_agent import PPOAgent
 from bot.squad_agent.random_agent import RandomAgent
 from bot.state import State
 from bot.unit_squads import UnitSquads
-from sc2.data import Result
-from sc2.ids.ability_id import AbilityId
-from sc2.ids.unit_typeid import UnitTypeId
-from sc2.position import Point3
-from sc2.unit import Unit
+from MapAnalyzer.MapData import MapData
 
 
 class Kitten(BotAIExt):
@@ -38,15 +37,14 @@ class Kitten(BotAIExt):
         "sent_chat",
     )
 
-    def __init__(self):
-        super().__init__()
+    agent: BaseAgent
+    map_data: MapData
+    pathing: Pathing
+    macro: Macro
+    unit_squads: UnitSquads
 
-        # initiate in `on_start`
-        self.agent: Optional[BaseAgent] = None
-        self.map_data: Optional[MapData] = None
-        self.pathing: Optional[Pathing] = None
-        self.macro: Optional[Macro] = None
-        self.unit_squads: Optional[UnitSquads] = None
+    def __init__(self) -> None:
+        super().__init__()
 
         self.config: Dict = dict()
         self.CONFIG_FILE = "config.yaml"
@@ -78,12 +76,10 @@ class Kitten(BotAIExt):
         else:
             self.agent = RandomAgent(self, self.config, self.pathing)
 
-        self.macro: Macro = Macro(
+        self.macro = Macro(
             self, self.unit_roles, self.workers_manager, self.map_data, self.debug
         )
-        self.unit_squads: UnitSquads = UnitSquads(
-            self, self.unit_roles, self.agent, self.terrain
-        )
+        self.unit_squads = UnitSquads(self, self.unit_roles, self.agent, self.terrain)
         self.client.game_step = self.config[ConfigSettings.GAME_STEP]
         self.client.raw_affects_selection = True
         self.agent.get_episode_data()
@@ -114,8 +110,9 @@ class Kitten(BotAIExt):
             and not self.sent_chat
             and isinstance(self.agent, OfflineAgent)
         ):
+            num_episodes: int = len(self.agent.all_episode_data)
             await self.chat_send(
-                f"Meow! This kitty has trained for {len(self.agent.all_episode_data)} episodes (happy)"
+                f"Meow! This kitty has trained for {num_episodes} episodes (happy)"
             )
             self.sent_chat = True
 
@@ -131,10 +128,10 @@ class Kitten(BotAIExt):
         if self.debug:
             height: float = self.get_terrain_z_height(self.terrain.own_nat)
             self.client.debug_text_world(
-                f"Own nat", Point3((*self.terrain.own_nat, height)), size=11
+                "Own nat", Point3((*self.terrain.own_nat, height)), size=11
             )
             self.client.debug_text_world(
-                f"Enemy nat", Point3((*self.terrain.enemy_nat, height)), size=11
+                "Enemy nat", Point3((*self.terrain.enemy_nat, height)), size=11
             )
             for unit in self.all_units:
                 self.client.debug_text_world(f"{unit.tag}", unit, size=9)

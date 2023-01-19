@@ -1,8 +1,8 @@
 from typing import Optional, Union
 
-from torch import cat, flatten, nn, Tensor
-from torch.distributions import Categorical
 import numpy as np
+from torch import Tensor, cat, flatten, nn
+from torch.distributions import Categorical
 
 # relative import required for training with docker
 try:
@@ -11,7 +11,9 @@ except ImportError:
     from ...squad_agent.architecture.encoder import Encoder
 
 
-def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+def layer_init(
+    layer: nn.Linear, std: float = np.sqrt(2), bias_const: float = 0.0
+) -> nn.Linear:
     nn.init.orthogonal_(layer.weight, std)
     nn.init.constant_(layer.bias, bias_const)
     return layer
@@ -48,14 +50,14 @@ class ActorCritic(nn.Module):
         lstm_state: tuple[Tensor, Tensor],
         done: Tensor,
         process_spatial: bool = True,
-    ):
+    ) -> tuple:
         hidden, processed_spatial = self.shared_layers(
             spatial, entity, scalar, locations, process_spatial
         )
 
         # LSTM logic
         batch_size: int = lstm_state[0].shape[1]
-        hidden: Tensor = hidden.reshape((-1, batch_size, self.lstm.input_size))
+        hidden = hidden.reshape((-1, batch_size, self.lstm.input_size))
         done = done.reshape((-1, batch_size))
         new_hidden: Union[list, Tensor] = []
         for h, d in zip(hidden, done):
@@ -95,12 +97,12 @@ class ActorCritic(nn.Module):
         done: Tensor,
         action: Tensor = None,
         process_spatial: bool = True,
-    ):
+    ) -> tuple:
         hidden, lstm_state, processed_spatial = self.get_states(
             spatial, entity, scalar, locations, lstm_state, done, process_spatial
         )
-        logits = self.policy_layers(hidden)
-        probs = Categorical(logits=logits)
+        logits: Tensor = self.policy_layers(hidden)
+        probs: Categorical = Categorical(logits=logits)
         if action is None:
             action = probs.sample()
         return (
@@ -112,7 +114,9 @@ class ActorCritic(nn.Module):
             processed_spatial,
         )
 
-    def forward(self, spatial: Tensor, entity: Tensor, scalar: Tensor):
+    def forward(
+        self, spatial: Tensor, entity: Tensor, scalar: Tensor
+    ) -> tuple[Tensor, float]:
         z, processed_spatial = self.shared_layers(spatial, entity, scalar)
         policy_logits = self.policy_layers(z)
         value = self.value_layers(z)

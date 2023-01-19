@@ -7,7 +7,8 @@ Steps:
 1. Set up AI-Arena docker image https://github.com/aiarena/local-play-bootstrap
 2. Move this python script to the root of `local-play-bootstrap` from the above repo
 3. Copy the entire `kitten` folder into the `bots` folder in `local-play-bootstrap`
-4. Find some other bots from AI-Arena to train against: https://aiarena.net/bots/downloadable/
+4. Find some other bots from AI-Arena to train against:
+    https://aiarena.net/bots/downloadable/
 5. Configure this script to set up the matches
 6. ???
 7. Profit
@@ -48,6 +49,6 @@ if __name__ == "__main__":
         system('cmd /c "docker-compose up"')
         system('cmd /c "conda activate Eris"')
         system(
-            'cmd /c "python D:\\kitten\\bot\\squad_agent\\training_scripts\\ppo_trainer.py"'
+            'cmd /c "python D:\\kitten\\bot\\squad_agent\\training_scripts\\ppo_trainer.py"'  # noqa: E501
         )
     print("matches ended")

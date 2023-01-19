@@ -1,17 +1,18 @@
 from random import randint
-from typing import List, Dict
+from typing import Dict, List
 
 from loguru import logger
-
-from bot.squad_agent.base_agent import BaseAgent
 from sc2.bot_ai import BotAI
 from sc2.data import Result
 from sc2.position import Point2
 from sc2.units import Units
 
+from bot.modules.pathing import Pathing
+from bot.squad_agent.base_agent import BaseAgent
+
 
 class RandomAgent(BaseAgent):
-    def __init__(self, ai: BotAI, config: Dict, pathing):
+    def __init__(self, ai: BotAI, config: Dict, pathing: Pathing) -> None:
         super().__init__(ai, config)
 
     def choose_action(
@@ -37,9 +38,9 @@ class RandomAgent(BaseAgent):
         self.action_distribution[action] += 1
         return action
 
-    def on_episode_end(self, result):
+    def on_episode_end(self, result: Result) -> None:
         logger.info("On episode end called")
-        _reward = 50.0 if result == Result.Victory else -50.0
+        _reward: float = 50.0 if result == Result.Victory else -50.0
         self.store_episode_data(
             result=result,
             steps=self.epoch,

@@ -1,16 +1,17 @@
 from collections import defaultdict
-from typing import Dict, Set, List, DefaultDict, Optional
+from typing import DefaultDict, Dict, List, Optional, Set
 
-from bot.consts import UnitRoleTypes, WORKERS_DEFEND_AGAINST
-from bot.modules.terrain import Terrain
-from bot.modules.unit_roles import UnitRoles
-from bot.state import State
 from sc2.bot_ai import BotAI
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.position import Point2
 from sc2.unit import Unit
 from sc2.units import Units
+
+from bot.consts import WORKERS_DEFEND_AGAINST, UnitRoleTypes
+from bot.modules.terrain import Terrain
+from bot.modules.unit_roles import UnitRoles
+from bot.state import State
 
 
 class WorkersManager:
@@ -56,7 +57,8 @@ class WorkersManager:
     @property
     def available_minerals(self) -> Units:
         """
-        Find all mineral fields available near a townhall that don't have 2 workers assigned to it yet
+        Find all mineral fields available near a townhall
+        that don't have 2 workers assigned to it yet
         """
         available_minerals: Units = Units([], self.ai)
         townhalls: Units = self.ai.townhalls.filter(lambda th: th.build_progress > 0.85)
@@ -95,8 +97,10 @@ class WorkersManager:
         self, target_position: Point2, force: bool = False
     ) -> Optional[Unit]:
         """
-        Note: Make sure to change the worker role once selected. Otherwise, it is selected to mine again
-        This doesn't select workers from geysers, so make sure to remove workers from gas if low on workers
+        Note: Make sure to change the worker role once selected.
+        Otherwise, it is selected to mine again
+        This doesn't select workers from geysers,
+        so make sure to remove workers from gas if low on workers
         """
         workers: Units = self.unit_roles.get_units_from_role(UnitRoleTypes.GATHERING)
         # workers: Units = self.ai.workers.tags_in(self.worker_to_mineral_patch_dict)
@@ -121,7 +125,8 @@ class WorkersManager:
                 lambda th: th.is_ready
                 and self.ai.mineral_field.closer_than(10, th).amount >= 8
             ).sorted_by_distance_to(target_position)
-            # seems there are no townhalls with plenty of resources, don't be fussy at this point
+            # seems there are no townhalls with plenty of resources,
+            # don't be fussy at this point
             if not townhalls:
                 return available_workers.closest_to(target_position)
 
@@ -135,6 +140,8 @@ class WorkersManager:
 
             if available_workers and force:
                 return available_workers.closest_to(target_position)
+
+        return None
 
     def _assign_workers(self, workers: Units) -> None:
         """
@@ -160,7 +167,8 @@ class WorkersManager:
 
     def _assign_worker_to_gas_buildings(self, gas_buildings: Units) -> None:
         """
-        We only assign one worker per step, with the hope of grabbing workers on far mineral patches
+        We only assign one worker per step,
+        with the hope of grabbing workers on far mineral patches
         @param gas_buildings:
         @return:
         """
@@ -169,7 +177,8 @@ class WorkersManager:
             if not self.ai.townhalls.closer_than(12, gas):
                 continue
 
-            # too many workers assigned, this can happen if we want to pull workers off gas
+            # too many workers assigned,
+            # this can happen if we want to pull workers off gas
             if (
                 len(self.geyser_to_list_of_workers.get(gas.tag, []))
                 > self.workers_per_gas
@@ -236,7 +245,8 @@ class WorkersManager:
             ):
                 continue
 
-            # find the closest mineral, then find the nearby minerals that are closest to the townhall
+            # find the closest mineral, then find the nearby minerals
+            # that are closest to the townhall
             closest_mineral: Unit = _minerals.closest_to(worker)
             nearby_minerals: Units = _minerals.closer_than(10, closest_mineral)
             th: Unit = self.ai.townhalls.closest_to(closest_mineral)
@@ -245,7 +255,8 @@ class WorkersManager:
             if len(self.mineral_patch_to_list_of_workers.get(mineral.tag, [])) < 2:
                 self._assign_worker_to_patch(mineral, worker)
 
-            # enough have been assigned to this patch, don't consider it on next iteration over loop
+            # enough have been assigned to this patch,
+            # don't consider it on next iteration over loop
             if len(self.mineral_patch_to_list_of_workers.get(mineral.tag, [])) >= 2:
                 _minerals.remove(mineral)
 
@@ -363,7 +374,8 @@ class WorkersManager:
     def remove_worker_from_vespene(self, worker_tag: int) -> None:
         """
         Remove worker from internal data structures.
-        This happens if worker gets assigned to do something else, or removing workers from gas
+        This happens if worker gets assigned to do something else,
+        or removing workers from gas
         @param worker_tag:
         @return:
         """
@@ -377,7 +389,7 @@ class WorkersManager:
             # using the gas building tag, we can remove from other collection
             self.geyser_to_list_of_workers[gas_building_tag].remove(worker_tag)
 
-    def _remove_gas_building(self, gas_building_tag):
+    def _remove_gas_building(self, gas_building_tag: int) -> None:
         """Remove gas building and assigned workers from bookkeeping"""
         if gas_building_tag in self.geyser_to_list_of_workers:
             del self.geyser_to_list_of_workers[gas_building_tag]
@@ -399,8 +411,9 @@ class WorkersManager:
 
     def _handle_worker_rush(self) -> None:
         """zerglings too !"""
-        # got to a point in time we don't care about this anymore, hopefully there are reapers around
-        # scvs should go idle, at which point the gathering resources logic should kick in
+        # got to a point in time we don't care about this anymore
+        # scvs should go idle, at which point the
+        # gathering resources logic should kick in
         if (
             self.ai.time > 200.0 and not self.enemy_committed_worker_rush
         ) or not self.ai.workers:

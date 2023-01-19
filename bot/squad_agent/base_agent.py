@@ -6,18 +6,18 @@ import json
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
 from os import path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 import torch
 from loguru import logger
-from torch.utils.tensorboard import SummaryWriter
-
-from bot.consts import SQUAD_ACTIONS, ConfigSettings
 from sc2.bot_ai import BotAI
 from sc2.data import Result
 from sc2.position import Point2
 from sc2.unit import Unit
 from sc2.units import Units
+from torch.utils.tensorboard import SummaryWriter
+
+from bot.consts import SQUAD_ACTIONS, ConfigSettings
 
 
 class BaseAgent(metaclass=ABCMeta):
@@ -61,19 +61,19 @@ class BaseAgent(metaclass=ABCMeta):
 
         self.cumulative_reward: float = 0.0
         self.squad_reward: float = 0.0
-        self.ml_training_file_path: path = path.join(
+        self.ml_training_file_path: str = path.join(
             self.DATA_DIR, "agent_training_history.json"
         )
         self.all_episode_data: List[Dict] = self.get_episode_data()
         self.previous_close_enemy: Optional[Units] = None
         self.previous_main_squad: Optional[Units] = None
 
-        self.writer = SummaryWriter("data/runs")
+        self.writer: SummaryWriter = SummaryWriter("data/runs")
         self.action_distribution: List[int] = [0 for _ in range(len(SQUAD_ACTIONS))]
 
         self.num_actions: int = len(SQUAD_ACTIONS)
 
-        self.CHECKPOINT_PATH: path = path.join(
+        self.CHECKPOINT_PATH: str = path.join(
             self.DATA_DIR,
             config[ConfigSettings.SQUAD_AGENT][ConfigSettings.CHECKPOINT_NAME],
         )
@@ -91,8 +91,8 @@ class BaseAgent(metaclass=ABCMeta):
         self.PLOT_TITLES: list[str] = []
 
         if self.visualize_spatial_features:
-            import matplotlib.pyplot as plt
             import matplotlib
+            import matplotlib.pyplot as plt
 
             matplotlib.use("TkAgg")
             # self.fig = plt.figure(figsize=(10, 7))
@@ -125,9 +125,10 @@ class BaseAgent(metaclass=ABCMeta):
     ) -> int:
         self.previous_main_squad = squad_units
         self.previous_close_enemy = all_close_enemy
+        return 0
 
     @abstractmethod
-    def on_episode_end(self, result):
+    def on_episode_end(self, result: Result) -> None:
         pass
 
     def on_unit_destroyed(self, tag: int) -> None:
@@ -137,8 +138,8 @@ class BaseAgent(metaclass=ABCMeta):
             value = (value.minerals + value.vespene * 1.5) / 700.0
             self.squad_reward -= value
         elif self.previous_close_enemy and tag in self.previous_close_enemy.tags:
-            unit: Unit = self.previous_close_enemy.find_by_tag(tag)
-            value = self.ai.calculate_unit_value(unit.type_id)
+            _unit: Unit = self.previous_close_enemy.find_by_tag(tag)
+            value = self.ai.calculate_unit_value(_unit.type_id)
             value = (value.minerals + value.vespene * 1.5) / 700.0
             self.squad_reward += value
 

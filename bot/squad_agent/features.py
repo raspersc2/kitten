@@ -1,16 +1,18 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 import torch
-from torch.nn.functional import one_hot
-
-from bot.botai_ext import BotAIExt
-from bot.consts import ConfigSettings, BUFF_TYPES, UNIT_TYPES
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
 from sc2.position import Point2
+from torch import Tensor
+from torch.nn.functional import one_hot
 
-# since we one hot encode unit type ids we don't want to hot encode 1961+ different values
+from bot.botai_ext import BotAIExt
+from bot.consts import BUFF_TYPES, UNIT_TYPES, ConfigSettings
+
+# since we one hot encode unit type ids
+# we don't want to hot encode 1961+ different values
 # so convert all unit type ids into our own index from consts
 BUFF_TYPE_DICT = dict(zip(BUFF_TYPES, range(0, len(BUFF_TYPES))))
 UNIT_TYPE_DICT = dict(zip(UNIT_TYPES, range(0, len(UNIT_TYPES))))
@@ -46,8 +48,8 @@ class Features:
 
         self.fig = None
         if self.visualize_spatial_features:
-            import matplotlib.pyplot as plt
             import matplotlib
+            import matplotlib.pyplot as plt
 
             matplotlib.use("TkAgg")
             self.fig = plt.figure(figsize=(10, 7))
@@ -216,9 +218,9 @@ class Features:
 
     def _process_spatial_info(
         self, ground_grid: np.ndarray, effects_grid: np.ndarray
-    ) -> torch.Tensor:
+    ) -> Tensor:
 
-        spatial_arr = []
+        spatial_arr: Union[list, Tensor] = []
         # location_grid = squad_grid.copy()
 
         ground_grid = ground_grid[None, :]
@@ -242,17 +244,6 @@ class Features:
         visibility = torch.tensor(visibility)
         spatial_arr.append(visibility)
 
-        # location_grid[self.mediator.get_rally_point.rounded] = 0.25
-        # location_grid[self.mediator.get_harass_target.rounded] = 0.5
-        # if (
-        #     ground_threats_near_townhall := self.mediator.get_main_ground_threats_near_townhall
-        # ):
-        #     location_grid[ground_threats_near_townhall.center.rounded] = 0.75
-        # location_grid[self.mediator.get_offensive_attack_target.rounded] = 1.0
-        # location_grid = location_grid[None, :]
-        # location_grid = torch.from_numpy(location_grid)
-        # spatial_arr.append(location_grid)
-
         spatial_arr = torch.cat(spatial_arr)
 
         return spatial_arr
@@ -266,7 +257,7 @@ class Features:
         """
         Basically any extra information that our agent may use
         """
-        scalars = [
+        scalars: Union[list, Tensor, np.ndarray] = [
             pos_of_squad.x,
             self.map_size_y - pos_of_squad.y,
             self.ai.structures.amount,

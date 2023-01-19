@@ -13,8 +13,53 @@ python = "^3.9"
 isort = "^5.11.4"
 black = "^22.12.0"
 flake8 = "^6.0.0"
-mypy = "^0.991"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+skip = [".gitignore", "python-sc2", "MapAnalyzer"]
+
+[tool.mypy]
+# 3rd party import
+ignore_missing_imports = true
+# dynamic typing
+disallow_any_unimported = false
+disallow_any_expr = false
+disallow_any_decorated = false
+disallow_any_explicit = false
+disallow_any_generics = false
+disallow_subclassing_any = true
+# platform
+python_version = "3.10"
+# untyped
+disallow_untyped_calls = false
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+# None and Optional
+no_implicit_optional = true
+# Warnings
+warn_return_any = false
+warn_unreachable = true
+# Misc
+pretty = true
+exclude = ["python-sc2", "MapAnalyzer", "run.py", "ladder.py"]
+
+[[tool.mypy.overrides]]
+module = [
+  "MapAnalyzer.*",
+  "run.py",
+  "ladder.py"
+]
+ignore_errors = true
+
+[tool.black]
+exclude = '''
+/(
+  | MapAnalyzer
+  | python-sc2
+)/
+'''

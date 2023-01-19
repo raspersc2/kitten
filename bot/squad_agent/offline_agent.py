@@ -1,34 +1,30 @@
 """
 The offline agent goal is to collect state, actions and rewards and store them to disk
 (Note: Fine to use this agent to test a trained model by setting InferenceMode: True)
-RL Training (back propagation) should then be carried out via a separate process / script
-    after the game is complete
+RL Training (back propagation) should then be carried out via a separate
+process / script after the game is complete
 """
 import os
 import pickle
 import time
-
+import uuid
 from os import path
 from typing import Dict, List
 
 import torch
-
-from bot.squad_agent.utils import load_checkpoint, save_checkpoint
+from loguru import logger
 from sc2.data import Result
-from torch import optim, nn
+from sc2.position import Point2
+from sc2.units import Units
+from torch import nn, optim
 
 from bot.botai_ext import BotAIExt
-from bot.consts import ConfigSettings, SQUAD_ACTIONS
+from bot.consts import SQUAD_ACTIONS, ConfigSettings
 from bot.modules.pathing import Pathing
 from bot.squad_agent.architecture.actor_critic import ActorCritic
 from bot.squad_agent.base_agent import BaseAgent
 from bot.squad_agent.features import Features
-from sc2.position import Point2
-from sc2.units import Units
-
-from loguru import logger
-import uuid
-from filelock import FileLock
+from bot.squad_agent.utils import load_checkpoint, save_checkpoint
 
 NUM_ENVS: int = 1
 SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 38, 120, 120)
@@ -61,8 +57,10 @@ class OfflineAgent(BaseAgent):
     )
 
     def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing):
-        # we will use the aiarena docker to play multiple simultaneous games to collect state, action, rewards etc.
-        # so use "cpu" here and the separate training script should use "cuda" if available
+        # we will use the aiarena docker to play multiple simultaneous
+        # games to collect state, action, rewards etc.
+        # so use "cpu" here and the separate training script
+        # should use "cuda" if available
         super().__init__(ai, config, "cpu")
 
         self.features: Features = Features(ai, config, 256, self.device)
@@ -86,7 +84,8 @@ class OfflineAgent(BaseAgent):
                 self.CHECKPOINT_PATH, self.model, self.optimizer, self.device
             )
             logger.info(f"Loaded existing model at {self.CHECKPOINT_PATH}")
-        # nothing stored on disk yet, there should be something there for the training script later
+        # nothing stored on disk yet,
+        # there should be something there for the training script later
         else:
             save_checkpoint(
                 self.CHECKPOINT_PATH, self.epoch, self.model, self.optimizer
@@ -202,7 +201,7 @@ class OfflineAgent(BaseAgent):
 
             return action.item()
 
-    def on_episode_end(self, result):
+    def on_episode_end(self, result: Result) -> None:
         if self.training_active:
             logger.info("On episode end called")
             _reward = 5.0 if result == Result.Victory else -5.0

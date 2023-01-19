@@ -3,13 +3,12 @@ import asyncio
 import logging
 
 import aiohttp
-from sc2.client import Client
-
 import sc2
+from sc2.client import Client
 from sc2.protocol import ConnectionAlreadyClosed
 
 
-def run_ladder_game(bot):
+def run_ladder_game(bot) -> None:
     # Load command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--GamePort", type=int, nargs="?", help="Game port")
@@ -70,7 +69,7 @@ async def join_ladder_game(
     save_replay_as=None,
     step_time_limit=None,
     game_time_limit=None,
-):
+) -> None:
     ws_url = f"ws://{host}:{port}/sc2api"
     ws_connection = await aiohttp.ClientSession().ws_connect(ws_url, timeout=120)
 
@@ -82,7 +81,7 @@ async def join_ladder_game(
         if save_replay_as is not None:
             await client.save_replay(save_replay_as)
     except ConnectionAlreadyClosed:
-        logging.error(f"Connection was closed before the game ended")
+        logging.error("Connection was closed before the game ended")
         return None
     finally:
         await ws_connection.close()

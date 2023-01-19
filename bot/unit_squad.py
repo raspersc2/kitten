@@ -1,12 +1,13 @@
-from typing import Set, Union, Optional, Dict
+from typing import Dict, Set, Union
 
-from bot.botai_ext import BotAIExt
-from bot.modules.pathing import Pathing
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.upgrade_id import UpgradeId
 from sc2.position import Point2
 from sc2.unit import Unit
 from sc2.units import Units
+
+from bot.botai_ext import BotAIExt
+from bot.modules.pathing import Pathing
 
 
 class UnitSquad:
@@ -162,11 +163,12 @@ class UnitSquad:
         elif should_stutter and not self.stuttering:
             # only call this once till weapons are ready again, so action isn't spammed
             self.stuttering = True
+            pos: Point2
             if self.stutter_forward:
-                pos: Point2 = self.current_action_position
+                pos = self.current_action_position
             else:
                 # get a path back home, and kite back using that
-                pos: Point2 = pathing.find_path_next_point(
+                pos = pathing.find_path_next_point(
                     start=self.squad_position,
                     target=self.ai.start_location,
                     grid=pathing.ground_grid,
@@ -181,7 +183,7 @@ class UnitSquad:
             return
 
         sample_unit: Unit = self.squad_units[0]
-        order_target: Optional[int, Point2] = sample_unit.order_target
+        order_target: Union[int, Point2, None] = sample_unit.order_target
 
         pos: Point2 = pathing.find_path_next_point(
             start=self.squad_position,

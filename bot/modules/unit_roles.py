@@ -1,10 +1,11 @@
-from typing import Dict, Set, Union, Optional, List
+from typing import Dict, List, Optional, Set, Union
 
-from bot.consts import UnitRoleTypes
 from sc2.bot_ai import BotAI
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.unit import Unit
 from sc2.units import Units
+
+from bot.consts import UnitRoleTypes
 
 
 class UnitRoles:
@@ -57,9 +58,10 @@ class UnitRoles:
         restrict_to: Optional[Units] = None,
     ) -> List[Unit]:
         """
-        Get all units of a given type that have a specified role. Moved to a function to avoid duplicated code.
-        If restrict_to is Units, this will only get the units of the specified type and role that are also in
-        restrict_to.
+        Get all units of a given type that have a specified role.
+        Moved to a function to avoid duplicated code.
+        If restrict_to is Units, this will only get the units
+        of the specified type and role that are also inrestrict_to.
         @param unit_type:
         @param role:
         @param restrict_to:
@@ -74,12 +76,11 @@ class UnitRoles:
 
         # take the intersection of the sets to get the shared tags
         # this will be the units of the specified type with the specified role
+        shared_tags: Set[int]
         if not restrict_to:
-            shared_tags: Set[int] = unit_with_role_tags & units_of_type_tags
+            shared_tags = unit_with_role_tags & units_of_type_tags
         else:
-            shared_tags: Set[int] = (
-                unit_with_role_tags & units_of_type_tags & restrict_to.tags
-            )
+            shared_tags = unit_with_role_tags & units_of_type_tags & restrict_to.tags
 
         return self.ai.units.tags_in(shared_tags)
 
@@ -90,9 +91,10 @@ class UnitRoles:
         restrict_to: Optional[Units] = None,
     ) -> Units:
         """
-        Get a Units object containing units with a given role. If a UnitID or set of UnitIDs are given, it will only
-        return units of those types, otherwise it will return all units with the role. If restrict_to is specified, it
-        will only retrieve units from that object.
+        Get a Units object containing units with a given role.
+        If a UnitID or set of UnitIDs are given, it will only
+        return units of those types, otherwise it will return all units with the role.
+        If restrict_to is specified, it will only retrieve units from that object.
         """
         if unit_type:
             if isinstance(unit_type, UnitTypeId):
@@ -102,7 +104,8 @@ class UnitRoles:
                     self.ai,
                 )
             else:
-                # will crash if not an iterable, but we should be careful with typing anyway
+                # will crash if not an iterable,
+                # but we should be careful with typing anyway
                 retrieved_units: List[Unit] = []
                 for type_id in unit_type:
                     retrieved_units.extend(
@@ -113,9 +116,10 @@ class UnitRoles:
                 return Units(retrieved_units, self.ai)
         else:
             # get every unit with the role
+            tags_to_get: Set[int]
             if restrict_to:
-                tags_to_get: Set[int] = self.unit_role_dict[role] & restrict_to.tags
+                tags_to_get = self.unit_role_dict[role] & restrict_to.tags
             else:
-                tags_to_get: Set[int] = self.unit_role_dict[role]
+                tags_to_get = self.unit_role_dict[role]
             # get the List[Unit] from UnitCacheManager and return as Units
             return self.ai.units.tags_in(tags_to_get)

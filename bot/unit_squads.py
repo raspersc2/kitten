@@ -4,21 +4,21 @@ Note: squad actions are carried out in `unit_squad.py`
 """
 import itertools
 import uuid
-from typing import Set, Dict, Any, List, Optional, Callable
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set
 
 from loguru import logger
+from sc2.ids.ability_id import AbilityId
+from sc2.ids.unit_typeid import UnitTypeId
+from sc2.position import Point2
+from sc2.units import Units
 
 from bot.botai_ext import BotAIExt
-from bot.consts import UnitRoleTypes, SQUAD_ACTIONS, SquadActionType, TOWNHALL_TYPES
+from bot.consts import SQUAD_ACTIONS, TOWNHALL_TYPES, SquadActionType, UnitRoleTypes
 from bot.modules.pathing import Pathing
 from bot.modules.terrain import Terrain
 from bot.modules.unit_roles import UnitRoles
 from bot.squad_agent.base_agent import BaseAgent
 from bot.unit_squad import UnitSquad
-from sc2.ids.ability_id import AbilityId
-from sc2.ids.unit_typeid import UnitTypeId
-from sc2.position import Point2
-from sc2.units import Units
 
 CREEP_TUMOR_TYPES: Set[UnitTypeId] = {
     UnitTypeId.CREEPTUMOR,
@@ -46,6 +46,9 @@ class UnitSquads:
         "expansions_generator",
         "next_base_location",
     )
+
+    expansions_generator: Iterator[Any]
+    next_base_location: Point2
 
     def __init__(
         self, ai: BotAIExt, unit_roles: UnitRoles, agent: BaseAgent, terrain: Terrain
@@ -92,9 +95,6 @@ class UnitSquads:
                 False,
             ),
         }
-
-        self.expansions_generator = None
-        self.next_base_location: Optional[Point2] = None
 
         # How often we get a new squad action (22.4 FPS)
         self.AGENT_FRAME_SKIP: int = 20
@@ -147,7 +147,8 @@ class UnitSquads:
             # aim for a new agent action once every 20 frames
             # the individual unit squad scripted control will be based on this action
             if squad.squad_id == id_of_largest_squad:
-                # update the action once every 20 frames (just under once per second (in-game time))
+                # update the action once every 20 frames
+                # (just under once per second (in-game time))
                 if iteration % (self.AGENT_FRAME_SKIP // self.ai.client.game_step) == 0:
                     # after 30 minutes, just attack regardless to simplify things
                     if self.ai.time > 1800.0:
@@ -163,15 +164,14 @@ class UnitSquads:
                             self.attack_target,
                             self.rally_point,
                         )
-                        logger.info(
-                            f"{self.ai.time_formatted} Chosen action: {SQUAD_ACTIONS[action]}"
-                        )
+                        time: str = self.ai.time_formatted
+                        logger.info(f"{time} Chosen action: {SQUAD_ACTIONS[action]}")
                         action_type: SquadActionType = SQUAD_ACTIONS[action]
                         if action_type in self.action_to_arguments:
                             squad.update_action(
                                 *self.action_to_arguments[action_type]()
                             )
-                        # Stim maintains previous action, we
+                        # Stim maintains previous action
                         elif action_type == SquadActionType.STIM:
                             squad.set_stim_status(True)
             else:
@@ -201,7 +201,7 @@ class UnitSquads:
             else:
                 self._create_squad({tag})
 
-    def _handle_existing_squads_assignment(self, army: Units):
+    def _handle_existing_squads_assignment(self, army: Units) -> None:
         """
         Handle units straying from squads, or multiple squads overlapping etc.
         """
@@ -228,7 +228,7 @@ class UnitSquads:
         if not self.squads:
             return ""
 
-        closest_squad: Optional[UnitSquad] = None
+        closest_squad: UnitSquad = self.squads[0]
         min_distance: float = 9998.9
         for squad in self.squads:
             if squad.squad_id == avoid_squad_id:
@@ -252,7 +252,7 @@ class UnitSquads:
         for tag in tags:
             self.assigned_unit_tags.add(tag)
 
-    def _remove_unit_tag(self, tag: int, squad_id: str):
+    def _remove_unit_tag(self, tag: int, squad_id: str) -> None:
         """
         Remove a unit tag from any data structures
         """
@@ -285,7 +285,7 @@ class UnitSquads:
         if squad_id_to_join != "" and squad_id_to_join in self.squads_dict:
             for unit in units:
                 self.squads_dict[squad_id_to_join][self.TAGS].add(unit.tag)
-        # no squad to join, remove from assigned_unit_tags so the units can be repurposed
+        # no squad to join, remove from assigned_unit_tags so units can be repurposed
         else:
             for unit in units:
                 tag = unit.tag
@@ -309,7 +309,9 @@ class UnitSquads:
 
         return False
 
-    def _get_largest_squad(self, squads):
+    def _get_largest_squad(
+        self, squads: list[UnitSquad]
+    ) -> tuple[str, Point2, UnitSquad]:
         """
         TODO: Largest based on supply instead
             Easier to calculate on number of units initially
@@ -317,7 +319,7 @@ class UnitSquads:
         main_group_id = ""
         # default value, last known position of main squad
         position_of_squad: Point2 = self.ai.start_location
-        largest_squad: Optional[UnitSquad] = None
+        largest_squad: UnitSquad = squads[0]
         num_units_in_main_group: int = 0
 
         for squad in squads:
@@ -332,14 +334,16 @@ class UnitSquads:
 
     def _regenerate_squad_units(self, army: Units) -> None:
         """
-        Using the recorded tags of each squad, regenerate a fresh Units object for this frame
+        Using the recorded tags of each squad,
+        regenerate a fresh Units object for this frame
         """
         squads_to_remove: List[Dict] = []
         for squad_id in self.squads_dict:
             squad_units: Units = Units(
                 army.tags_in(self.squads_dict[squad_id][self.TAGS]), self.ai
             )
-            # squads may contain no more units (we don't clear up the tags of dead units)
+            # squads may contain no more units
+            # (we don't clear up the tags of dead units)
             if not squad_units:
                 squads_to_remove.append({"id": squad_id})
                 continue
@@ -353,7 +357,7 @@ class UnitSquads:
         for squad_to_remove in squads_to_remove:
             self._remove_squad(squad_to_remove["id"])
 
-    def _set_rally_point(self):
+    def _set_rally_point(self) -> None:
         if len(self.ai.townhalls) > 1:
             self.rally_point = self.ai.townhalls.furthest_to(
                 self.ai.start_location

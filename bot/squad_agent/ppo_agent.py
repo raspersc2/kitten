@@ -1,31 +1,27 @@
 """
 The offline agent goal is to collect state, actions and rewards and store them to disk
 (Note: Fine to use this agent to test a trained model by setting InferenceMode: True)
-RL Training (back propagation) should then be carried out via a separate process / script
-    after the game is complete
+RL Training (back propagation) should then be carried out
+via a separate process / script after the game is complete
 """
-import os
 from os import path
 from typing import Dict, List
 
 import numpy as np
 import torch
-
-from bot.squad_agent.utils import load_checkpoint, save_checkpoint
+from loguru import logger
 from sc2.data import Result
-from torch import optim, nn, Tensor
+from sc2.position import Point2
+from sc2.units import Units
+from torch import Tensor, nn, optim
 
 from bot.botai_ext import BotAIExt
-from bot.consts import ConfigSettings, SQUAD_ACTIONS
+from bot.consts import SQUAD_ACTIONS, ConfigSettings
 from bot.modules.pathing import Pathing
 from bot.squad_agent.architecture.actor_critic import ActorCritic
 from bot.squad_agent.base_agent import BaseAgent
 from bot.squad_agent.features import Features
-from sc2.position import Point2
-from sc2.units import Units
-
-from loguru import logger
-import uuid
+from bot.squad_agent.utils import load_checkpoint, save_checkpoint
 
 NUM_ENVS: int = 1
 SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 38, 120, 120)
@@ -67,8 +63,10 @@ class PPOAgent(BaseAgent):
     )
 
     def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing):
-        # we will use the aiarena docker to play multiple simultaneous games to collect state, action, rewards etc.
-        # so use "cpu" here and the separate training script should use "cuda" if available
+        # we will use the aiarena docker to play multiple simultaneous games
+        # to collect state, action, rewards etc.
+        # so use "cpu" here and
+        # the separate training script should use "cuda" if available
         super().__init__(ai, config, "cpu")
 
         self.features: Features = Features(ai, config, 256, self.device)
@@ -92,7 +90,8 @@ class PPOAgent(BaseAgent):
                 self.CHECKPOINT_PATH, self.model, self.optimizer, self.device
             )
             logger.info(f"Loaded existing model at {self.CHECKPOINT_PATH}")
-        # nothing stored on disk yet, there should be something there for the training script later
+        # nothing stored on disk yet,
+        # there should be something there for the training script later
         else:
             save_checkpoint(
                 self.CHECKPOINT_PATH, self.epoch, self.model, self.optimizer
@@ -129,7 +128,6 @@ class PPOAgent(BaseAgent):
 
         self.data_chunk: int = 0
 
-        ppo_settings: dict = self.config[ConfigSettings.SQUAD_AGENT][ConfigSettings.PPO]
         self.clip_coefficient: float = ppo_settings[ConfigSettings.CLIP_COEFFICIENT]
         self.entropy_coefficient: float = ppo_settings[
             ConfigSettings.ENTROPY_COEFFICIENT
@@ -138,7 +136,6 @@ class PPOAgent(BaseAgent):
         self.gae_lambda: float = ppo_settings[ConfigSettings.GAE_LAMBDA]
         self.gamma: float = ppo_settings[ConfigSettings.GAMMA]
         self.max_grad_norm: float = ppo_settings[ConfigSettings.MAX_GRAD_NORM]
-        self.num_rollout_steps: int = ppo_settings[ConfigSettings.NUM_ROLLOUT_STEPS]
         self.update_policy_epochs: int = ppo_settings[
             ConfigSettings.UPDATE_POLICY_EPOCHS
         ]
@@ -213,14 +210,15 @@ class PPOAgent(BaseAgent):
                     self.rewards[step] = self.reward
                     self.squad_reward = 0.0
                 else:
-                    # load the up-to-date model, or we just be overwriting other processes
+                    # load the up-to-date model,
+                    # or we just be overwriting other processes
                     self.model, self.optimizer, self.epoch = load_checkpoint(
                         self.CHECKPOINT_PATH, self.model, self.optimizer, self.device
                     )
                     self.current_rollout_step = 0
                     logger.info("Performing back propagation")
                     self._back_propagation()
-                    logger.info(f"Storing updated model")
+                    logger.info("Storing updated model")
                     save_checkpoint(
                         self.CHECKPOINT_PATH, self.epoch, self.model, self.optimizer
                     )
@@ -259,7 +257,7 @@ class PPOAgent(BaseAgent):
                 else:
                     next_non_terminal = 1.0 - 0
                     next_values = values[t + 1]
-                delta: float = (
+                delta: Tensor = (
                     rewards[t]
                     + self.gamma * next_values * next_non_terminal
                     - values[t]
@@ -272,13 +270,13 @@ class PPOAgent(BaseAgent):
 
             # flatten the batch
             b_entities: Tensor = entities.reshape((-1,) + ENTITY_SHAPE)
-            b_entities: Tensor = torch.squeeze(b_entities)
+            b_entities = torch.squeeze(b_entities)
             b_scalars: Tensor = scalars.reshape((-1,) + SCALAR_SHAPE)
-            b_scalars: Tensor = torch.squeeze(b_scalars)
+            b_scalars = torch.squeeze(b_scalars)
             b_spatials: Tensor = spatials.reshape((-1,) + SPATIAL_SHAPE)
-            b_spatials: Tensor = torch.squeeze(b_spatials)
+            b_spatials = torch.squeeze(b_spatials)
             b_locations: Tensor = locations.reshape((-1,) + (256, 2))
-            b_locations: Tensor = torch.squeeze(b_locations)
+            b_locations = torch.squeeze(b_locations)
             b_logprobs: Tensor = logprobs.reshape(-1)
             b_actions: Tensor = actions.reshape(-1)
             b_dones: Tensor = dones.reshape(-1)
@@ -384,10 +382,10 @@ class PPOAgent(BaseAgent):
         self.writer.add_scalar("losses/approx_kl", approx_kl.item(), self.epoch)
         self.epoch += 1
 
-    def on_episode_end(self, result):
+    def on_episode_end(self, result: Result) -> None:
         if self.training_active:
             logger.info("On episode end called")
-            _reward = 5.0 if result == Result.Victory else -5.0
+            _reward: float = 5.0 if result == Result.Victory else -5.0
             self.store_episode_data(
                 result,
                 self.epoch,

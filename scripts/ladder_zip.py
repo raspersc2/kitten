@@ -1,23 +1,23 @@
-from typing import Dict, List, Tuple
 import platform
-from os import path, remove, walk
-from subprocess import run, Popen
-import yaml
 import zipfile
+from os import path, remove, walk
+from typing import Dict, List, Tuple
 
 CONFIG_FILE: str = "config.yaml"
+FILETYPES_TO_IGNORE: Tuple
+ZIP_FILES: List[str]
 if platform.system() == "Windows":
-    FILETYPES_TO_IGNORE: Tuple = (".c", ".so", "pyx")
+    FILETYPES_TO_IGNORE = (".c", ".so", "pyx")
     ROOT_DIRECTORY = "../"
-    ZIP_FILES: List[str] = [
+    ZIP_FILES = [
         "config.yaml",
         "ladder.py",
         "run.py",
     ]
 else:
-    FILETYPES_TO_IGNORE: Tuple = (".c", ".pyd", "pyx")
+    FILETYPES_TO_IGNORE = (".c", ".pyd", "pyx")
     ROOT_DIRECTORY = "./"
-    ZIP_FILES: List[str] = [
+    ZIP_FILES = [
         "config.yaml",
         "ladder.py",
         "run.py",
@@ -32,7 +32,7 @@ ZIP_DIRECTORIES: Dict[str, Dict] = {
 }
 
 
-def zip_dir(dir_path, zip_file):
+def zip_dir(dir_path: str, zip_file: zipfile.ZipFile) -> None:
     """
     Will walk through a directory recursively and add all folders and files to zipfile
     @param dir_path:
@@ -59,7 +59,9 @@ def zip_files_and_directories() -> None:
     if path.isfile(path_to_zipfile):
         remove(path_to_zipfile)
     # create a new zip file
-    zip_file = zipfile.ZipFile(path_to_zipfile, "w", zipfile.ZIP_DEFLATED)
+    zip_file: zipfile.ZipFile = zipfile.ZipFile(
+        path_to_zipfile, "w", zipfile.ZIP_DEFLATED
+    )
 
     # write directories to the zipfile
     for directory, values in ZIP_DIRECTORIES.items():
@@ -78,4 +80,3 @@ def zip_files_and_directories() -> None:
 
 if __name__ == "__main__":
     zip_files_and_directories()
-

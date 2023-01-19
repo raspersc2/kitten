@@ -1,9 +1,9 @@
-from torch import arange, mean, nn, sum, tensor, Tensor, nan_to_num
-from torch.nn.functional import relu
 import numpy as np
+from torch import Tensor, arange, mean, nn, sum, tensor
+from torch.nn.functional import relu
 
 
-def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+def layer_init(layer, std: float = np.sqrt(2), bias_const: float = 0.0) -> None:
     nn.init.orthogonal_(layer.weight, std)
     nn.init.constant_(layer.bias, bias_const)
     return layer
@@ -20,7 +20,7 @@ class EntityEncoder(nn.Module):
         self.fc1 = layer_init(nn.Linear(128, 32))
         self.embed_fc = layer_init(nn.Linear(128, 32))
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         batch_size = x.shape[0]
         tmp_x = mean(x, dim=2, keepdim=False)
         tmp_y = tmp_x != 0

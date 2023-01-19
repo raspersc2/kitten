@@ -1,23 +1,23 @@
-from typing import Union, List, Set, Tuple, Optional, Dict
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 from s2clientprotocol import raw_pb2 as raw_pb
 from s2clientprotocol import sc2api_pb2 as sc_pb
-from scipy.spatial import KDTree
-
-from bot.consts import ALL_STRUCTURES, UNIT_DATA
 from sc2.bot_ai import BotAI
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.position import Point2
 from sc2.units import Units
+from scipy.spatial import KDTree
+
+from bot.consts import ALL_STRUCTURES, UNIT_DATA
 
 
 class BotAIExt(BotAI):
-    def __init__(self):
+    def __init__(self) -> None:
         self.enemy_tree: Optional[KDTree] = None
 
-    async def on_step(self, iteration: int):
+    async def on_step(self, iteration: int) -> None:
         pass
 
     def enemies_in_range(self, units: Units, distance: float) -> Dict[int, Units]:
@@ -64,12 +64,12 @@ class BotAIExt(BotAI):
         order: AbilityId,
         unit_tags: Union[List[int], Set[int]],
         target: Optional[Union[Point2, int]] = None,
-    ):
+    ) -> None:
         """
         Give units corresponding to the given tags the same order.
         @param order: the order to give to all units
         @param unit_tags: the tags of the units to give the order to
-        @param target: either a Point2 of the location to target or the tag of the unit to target
+        @param target: either a Point2 of the location or the tag of the unit to target
         """
         if not target:
             # noinspection PyProtectedMember

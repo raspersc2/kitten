@@ -1,20 +1,22 @@
 """
 Basic macro that focuses on bio production and upgrades
-This should probably be rewritten / refactored into separate files for anything more complicated
+This should probably be rewritten /
+    refactored into separate files for anything more complicated
 """
-from typing import Optional, List, Set
+from typing import List, Optional, Set
 
-from MapAnalyzer import MapData, Region
-from bot.botai_ext import BotAIExt
-from bot.consts import UnitRoleTypes
-from bot.modules.unit_roles import UnitRoles
-from bot.modules.workers import WorkersManager
-from bot.state import State
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
 from sc2.position import Point2, Point3, Pointlike
 from sc2.units import Units
+
+from bot.botai_ext import BotAIExt
+from bot.consts import UnitRoleTypes
+from bot.modules.unit_roles import UnitRoles
+from bot.modules.workers import WorkersManager
+from bot.state import State
+from MapAnalyzer import MapData, Region
 
 
 class Macro:
@@ -29,6 +31,8 @@ class Macro:
         "max_workers",
     )
 
+    state: State
+
     def __init__(
         self,
         ai: BotAIExt,
@@ -42,7 +46,6 @@ class Macro:
         self.workers_manager: WorkersManager = workers_manager
         self.map_data: MapData = map_data
         self.debug: bool = debug
-        self.state: Optional[State] = None
         ramp = self.ai.main_base_ramp
         corner_depots = list(ramp.corner_depots)
         self.depot_positions: List[Point2] = [
@@ -160,7 +163,8 @@ class Macro:
         # try to build depot at one of our precalculated spots
         if len(self.depot_positions) > 0:
             pos: Point2 = self.depot_positions[0]
-            # this might rarely happen, remove the point, return and try with new point next time
+            # this might rarely happen, remove the point,
+            # return and try with new point next time
             if not self.ai.in_placement_grid(pos):
                 self.depot_positions = self.depot_positions[1:]
                 return
@@ -216,7 +220,7 @@ class Macro:
 
         await self._build_structure(UnitTypeId.BARRACKS, build_area)
 
-    def _manage_upgrades(self):
+    def _manage_upgrades(self) -> None:
         ccs: Units = self.state.ccs
         if ccs and self.ai.can_afford(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND):
             ccs.first(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND)
@@ -265,10 +269,11 @@ class Macro:
         specific_location: Optional[Point2] = None,
         placement_step: int = 3,
     ) -> None:
+        location: Point2
         if specific_location:
-            location: Point2 = specific_location
+            location = specific_location
         else:
-            location: Point2 = await self.ai.find_placement(
+            location = await self.ai.find_placement(
                 structure_type, placement_area, placement_step=placement_step
             )
         if location:
@@ -277,7 +282,7 @@ class Macro:
                 self.workers_manager.remove_worker_from_mineral(worker.tag)
                 worker.build(structure_type, location)
 
-    def _build_refineries(self):
+    def _build_refineries(self) -> None:
         if len(self.ai.gas_buildings) == 2:
             return
 
@@ -288,7 +293,7 @@ class Macro:
         num_rax: int = len(self.state.barracks)
         max_gas: int = 2 if num_rax >= 4 else 0
         current_gas_num = pending + self.ai.gas_buildings.amount
-        # Build refineries (on nearby vespene) when at least one barracks is in construction
+        # Build refineries when at least one barracks is in construction
         if current_gas_num >= max_gas or not self.ai.can_afford(UnitTypeId.REFINERY):
             return
 
@@ -310,11 +315,13 @@ class Macro:
 
     def _calculate_supply_placements(self) -> None:
         """
-        Depots placements around the edge of the main base to make room for everything else
+        Depots placements around the edge of the main base to make room
         TODO: Current status -> Good enough
             But try to get depot placements all round the edge
         """
-        region: Region = self.map_data.in_region_p(self.ai.start_location)
+        region: Optional[Region] = self.map_data.in_region_p(self.ai.start_location)
+        if not region:
+            return
         # reposition these points slightly inwards
         potential_depot_positions: Set[Point2] = {
             p.towards(region.center, 2.0).rounded
@@ -368,7 +375,7 @@ class Macro:
             or self.ai.already_pending(structure_type) >= max_pending
         )
 
-    async def _build_bays(self):
+    async def _build_bays(self) -> None:
         bay_type: UnitTypeId = UnitTypeId.ENGINEERINGBAY
         bays = self.ai.structures(bay_type)
 

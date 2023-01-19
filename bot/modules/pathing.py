@@ -1,15 +1,15 @@
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
-from scipy import spatial
-
-from MapAnalyzer import MapData
-from bot.consts import ALL_STRUCTURES, INFLUENCE_COSTS, EFFECT_COSTS
 from sc2.bot_ai import BotAI
 from sc2.ids.effect_id import EffectId
 from sc2.position import Point2
 from sc2.unit import Unit
 from sc2.units import Units
+from scipy import spatial
+
+from bot.consts import ALL_STRUCTURES, EFFECT_COSTS, INFLUENCE_COSTS
+from MapAnalyzer import MapData
 
 
 class Pathing:
@@ -24,13 +24,13 @@ class Pathing:
         "RANGE_BUFFER",
     )
 
-    def __init__(self, ai: BotAI, map_data: Optional[MapData]):
+    def __init__(self, ai: BotAI, map_data: MapData):
         self.ai: BotAI = ai
-        self.map_data: Optional[MapData] = map_data
+        self.map_data: MapData = map_data
         self.memory_unit_tags: Dict[int, Dict] = dict()
         self.memory_units: Units = Units([], self.ai)
-        self.effects_grid: Optional[np.ndarray] = None
-        self.ground_grid: Optional[np.ndarray] = None
+        self.effects_grid: np.ndarray = np.ones((1, 1))
+        self.ground_grid: np.ndarray = np.ones((1, 1))
         self.TIME_IN_MEMORY: float = 15.0
         # this buffer is fairly large, since we are pathing as a squad in this project
         # rather than precise individual unit control
@@ -160,10 +160,12 @@ class Pathing:
         weight_safety_limit: float = 1.0,
     ) -> bool:
         """
-        Checks if the current position is dangerous by comparing against default_grid_weights
+        Checks if the current position is dangerous
+        by comparing against default_grid_weights
         @param grid: Grid we want to check
         @param position: Position of the unit etc
-        @param weight_safety_limit: The threshold at which we declare the position safe
+        @param weight_safety_limit: The threshold at which we declare
+            the position safe
         @return:
         """
         position = position.rounded
@@ -185,7 +187,8 @@ class Pathing:
         @return:
         """
         # this unit is in our dictionary where we define custom weights and ranges
-        # it could be this unit doesn't have a weapon in the API or we just want to use custom values
+        # it could be this unit doesn't have a weapon in the API
+        #   or we just want to use custom values
         if enemy.type_id in INFLUENCE_COSTS:
             values: Dict = INFLUENCE_COSTS[enemy.type_id]
             self.ground_grid = self._add_cost(
@@ -194,7 +197,8 @@ class Pathing:
                 values["GroundRange"] + self.RANGE_BUFFER,
                 self.ground_grid,
             )
-        # this unit has values in the API and is not in our custom dictionary, take them from there
+        # this unit has values in the API and is not in our custom dictionary,
+        # take them from there
         elif enemy.can_attack_ground:
             self.ground_grid = self._add_cost(
                 enemy.position,

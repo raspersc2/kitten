@@ -1,8 +1,7 @@
 from enum import Enum, auto
-from typing import Set, Dict
+from typing import Dict, Set
 
 from sc2.ids.effect_id import EffectId
-
 from sc2.ids.unit_typeid import UnitTypeId
 
 TOWNHALL_TYPES: set[UnitTypeId] = {

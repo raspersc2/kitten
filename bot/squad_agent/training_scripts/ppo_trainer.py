@@ -3,27 +3,20 @@ Run independently of bot
 Run game with `OfflineAgent` to collect data
 Then use this to load model, data and perform back propagation and save the model
 """
-import pickle
 import re
-from os import listdir, makedirs, path
+from os import PathLike, listdir, makedirs, path
 from pathlib import Path
+from typing import Dict, List
 
 import numpy as np
 import torch
-from typing import Dict, List
-
-import yaml
+import yaml  # type: ignore
 from loguru import logger
-from torch import optim, nn, Tensor
+from torch import Tensor, nn, optim
 from torch.utils.tensorboard import SummaryWriter
 
-
-def natural_key(string_):
-    """See https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/"""
-    return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", string_)]
-
-
-# need relative imports here, as this script might be run from a completely different location then expected
+# need relative imports here,
+# as this script might be run from a completely different location then expected
 try:
     from bot.consts import SQUAD_ACTIONS, ConfigSettings
     from bot.squad_agent.architecture.actor_critic import ActorCritic
@@ -34,6 +27,11 @@ except ImportError:
     from ...squad_agent.utils import load_checkpoint, save_checkpoint
 
 import shutil
+
+
+def natural_key(string_: str) -> list[str]:
+    """See https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/"""
+    return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", string_)]
 
 
 SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 38, 120, 120)
@@ -56,7 +54,7 @@ class PPOTrainer:
             root_dir, self.config[ConfigSettings.DATA_DIRECTORY]
         )
 
-        self.CHECKPOINT_PATH: path = path.join(
+        self.CHECKPOINT_PATH: str = path.join(
             self.DATA_DIR,
             self.config[ConfigSettings.SQUAD_AGENT][ConfigSettings.CHECKPOINT_NAME],
         )
@@ -113,31 +111,31 @@ class PPOTrainer:
         if not path.exists(self.states_dir):
             makedirs(self.states_dir)
 
-        self.remove_paths: List[path] = []
+        self.remove_paths: List[PathLike] = []
         self.value_loss = 0.0
         self.policy_loss = 0.0
 
     def learn(self) -> None:
         for game_folder in listdir(self.states_dir):
-            game_dir: path = path.join(self.states_dir, game_folder)
+            game_dir: PathLike = path.join(self.states_dir, game_folder)
             self.remove_paths.append(game_dir)
             file_names: list[str] = listdir(game_dir)
             file_names = sorted(file_names, key=natural_key)
             for tensors_file in file_names:
 
                 if tensors_file.endswith(".pt"):
+                    _path = path.join(self.states_dir, game_folder, tensors_file)
                     logger.info(f"Processing {tensors_file} from game id {game_folder}")
                     try:
                         tensors = torch.load(
-                            path.join(self.states_dir, game_folder, tensors_file),
+                            _path,
                             map_location=self.device,
                         )
                         self._back_propagation(tensors)
-                    # get corrupted file on rare occasion, don't understand well enough to throw proper exception
-                    except:
-                        print(
-                            f"Failed to load {path.join(self.states_dir, game_folder, tensors_file)}"
-                        )
+                    # get corrupted file on some occasions,
+                    # don't understand well enough to throw proper exception
+                    except:  # NOQA E722
+                        print(f"Failed to load {_path}")
 
         for game_dir in self.remove_paths:
             logger.info(f"Removing {game_dir} directory")
@@ -147,7 +145,9 @@ class PPOTrainer:
         save_checkpoint(self.CHECKPOINT_PATH, self.epoch, self.model, self.optimizer)
 
         logger.info(
-            f"Training complete, Value loss: {self.value_loss}, Policy loss: {self.policy_loss}, Epoch: {self.epoch}"
+            f"Training complete, Value loss: {self.value_loss},"
+            f"Policy loss: {self.policy_loss},"
+            f"Epoch: {self.epoch}"
         )
 
     def _back_propagation(self, tensors: dict[str, Tensor]) -> None:
@@ -195,13 +195,13 @@ class PPOTrainer:
 
             # flatten the batch
             b_entities: Tensor = entities.reshape((-1,) + ENTITY_SHAPE)
-            b_entities: Tensor = torch.squeeze(b_entities)
+            b_entities = torch.squeeze(b_entities)
             b_scalars: Tensor = scalars.reshape((-1,) + SCALAR_SHAPE)
-            b_scalars: Tensor = torch.squeeze(b_scalars)
+            b_scalars = torch.squeeze(b_scalars)
             b_spatials: Tensor = spatials.reshape((-1,) + SPATIAL_SHAPE)
-            b_spatials: Tensor = torch.squeeze(b_spatials)
+            b_spatials = torch.squeeze(b_spatials)
             b_locations: Tensor = locations.reshape((-1,) + (256, 2))
-            b_locations: Tensor = torch.squeeze(b_locations)
+            b_locations = torch.squeeze(b_locations)
             b_logprobs: Tensor = logprobs.reshape(-1)
             b_actions: Tensor = actions.reshape(-1)
             b_dones: Tensor = dones.reshape(-1)
