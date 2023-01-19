@@ -5,9 +5,9 @@ GameStep: 4
 # This shows exactly what will be passed through the conv layers
 VisualizeSpatialFeatures: False
 SquadAgent:
-  AgentClass: "PPOAgent"
+  AgentClass: "OfflineAgent"
   CheckPointName: "checkpoint.pt"
-  InferenceMode: False
+  InferenceMode: True
   NumRolloutSteps: 64
   # Offline agent stores states, actions, rewards etc. here
   StateDirectory: "states"
