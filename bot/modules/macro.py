@@ -221,6 +221,9 @@ class Macro:
         if ccs and self.ai.can_afford(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND):
             ccs.first(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND)
 
+        if not self.state.factories:
+            return
+
         if self.ai.structures.filter(
             lambda u: u.type_id == UnitTypeId.BARRACKSTECHLAB and u.is_idle
         ):
@@ -275,12 +278,16 @@ class Macro:
                 worker.build(structure_type, location)
 
     def _build_refineries(self):
-        # 2 gas buildings
+        if len(self.ai.gas_buildings) == 2:
+            return
+
+        pending = self.ai.already_pending(UnitTypeId.REFINERY)
+        if pending:
+            return
+
         num_rax: int = len(self.state.barracks)
         max_gas: int = 2 if num_rax >= 4 else 0
-        current_gas_num = (
-            self.ai.already_pending(UnitTypeId.REFINERY) + self.ai.gas_buildings.amount
-        )
+        current_gas_num = pending + self.ai.gas_buildings.amount
         # Build refineries (on nearby vespene) when at least one barracks is in construction
         if current_gas_num >= max_gas or not self.ai.can_afford(UnitTypeId.REFINERY):
             return
@@ -365,7 +372,7 @@ class Macro:
         bay_type: UnitTypeId = UnitTypeId.ENGINEERINGBAY
         bays = self.ai.structures(bay_type)
 
-        if self._dont_build(bays, bay_type) or len(self.state.factories) < 1:
+        if self._dont_build(bays, bay_type) or len(self.state.starports) < 1:
             return
 
         await self._build_structure(bay_type, self.state.main_build_area)

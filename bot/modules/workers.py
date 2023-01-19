@@ -98,17 +98,24 @@ class WorkersManager:
         Note: Make sure to change the worker role once selected. Otherwise, it is selected to mine again
         This doesn't select workers from geysers, so make sure to remove workers from gas if low on workers
         """
-
-        workers: Units = self.ai.workers.tags_in(self.worker_to_mineral_patch_dict)
+        workers: Units = self.unit_roles.get_units_from_role(UnitRoleTypes.GATHERING)
+        # workers: Units = self.ai.workers.tags_in(self.worker_to_mineral_patch_dict)
         # there is a chance we have no workers
         if not workers:
             return
 
-        if available_workers := workers.filter(
-            lambda w: w.tag in self.worker_to_mineral_patch_dict
+        available_workers: Units = workers.filter(
+            lambda w: w.tag not in self.worker_to_mineral_patch_dict
             and w.tag not in self.worker_to_geyser_dict
-            and not w.is_carrying_resource
-        ):
+        )
+        if not available_workers:
+            available_workers = workers.filter(
+                lambda w: w.tag in self.worker_to_mineral_patch_dict
+                and w.tag not in self.worker_to_geyser_dict
+                and not w.is_carrying_resource
+            )
+
+        if available_workers:
             # find townhalls with plenty of mineral patches
             townhalls: Units = self.ai.townhalls.filter(
                 lambda th: th.is_ready
