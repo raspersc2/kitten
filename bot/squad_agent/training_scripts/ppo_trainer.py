@@ -3,6 +3,8 @@ Run independently of bot
 Run game with `OfflineAgent` to collect data
 Then use this to load model, data and perform back propagation and save the model
 """
+import pickle
+import re
 from os import listdir, makedirs, path
 from pathlib import Path
 
@@ -14,6 +16,12 @@ import yaml
 from loguru import logger
 from torch import optim, nn, Tensor
 from torch.utils.tensorboard import SummaryWriter
+
+
+def natural_key(string_):
+    """See https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/"""
+    return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", string_)]
+
 
 # need relative imports here, as this script might be run from a completely different location then expected
 try:
@@ -113,15 +121,23 @@ class PPOTrainer:
         for game_folder in listdir(self.states_dir):
             game_dir: path = path.join(self.states_dir, game_folder)
             self.remove_paths.append(game_dir)
-            for tensors_file in listdir(game_dir):
+            file_names: list[str] = listdir(game_dir)
+            file_names = sorted(file_names, key=natural_key)
+            for tensors_file in file_names:
 
                 if tensors_file.endswith(".pt"):
                     logger.info(f"Processing {tensors_file} from game id {game_folder}")
-                    tensors = torch.load(
-                        path.join(self.states_dir, game_folder, tensors_file),
-                        map_location=self.device,
-                    )
-                    self._back_propagation(tensors)
+                    try:
+                        tensors = torch.load(
+                            path.join(self.states_dir, game_folder, tensors_file),
+                            map_location=self.device,
+                        )
+                        self._back_propagation(tensors)
+                    # get corrupted file on rare occasion, don't understand well enough to throw proper exception
+                    except:
+                        print(
+                            f"Failed to load {path.join(self.states_dir, game_folder, tensors_file)}"
+                        )
 
         for game_dir in self.remove_paths:
             logger.info(f"Removing {game_dir} directory")
