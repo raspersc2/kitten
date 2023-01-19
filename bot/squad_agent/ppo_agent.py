@@ -213,6 +213,10 @@ class PPOAgent(BaseAgent):
                     self.rewards[step] = self.reward
                     self.squad_reward = 0.0
                 else:
+                    # load the up-to-date model, or we just be overwriting other processes
+                    self.model, self.optimizer, self.epoch = load_checkpoint(
+                        self.CHECKPOINT_PATH, self.model, self.optimizer, self.device
+                    )
                     self.current_rollout_step = 0
                     logger.info("Performing back propagation")
                     self._back_propagation()
@@ -396,4 +400,11 @@ class PPOAgent(BaseAgent):
                 current_step = self.num_rollout_steps - 1
             self.rewards[current_step] = _reward
             self.dones[current_step] = 1
-            # TODO: Store things to disk
+            # load the up-to-date model, or we just be overwriting other processes
+            self.model, self.optimizer, self.epoch = load_checkpoint(
+                self.CHECKPOINT_PATH, self.model, self.optimizer, self.device
+            )
+            self._back_propagation()
+            save_checkpoint(
+                self.CHECKPOINT_PATH, self.epoch, self.model, self.optimizer
+            )
