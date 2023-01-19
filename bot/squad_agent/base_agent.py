@@ -157,6 +157,7 @@ class BaseAgent(metaclass=ABCMeta):
                     "Result": 0,
                     "OppID": self.ai.opponent_id,
                     "ActionDistribution": [],
+                    "MapName": self.ai.game_info.map_name,
                 }
             ]
         else:
@@ -165,7 +166,7 @@ class BaseAgent(metaclass=ABCMeta):
         return episode_data
 
     def store_episode_data(self, result, steps, reward, action_distribution) -> None:
-
+        logger.info("Storing episode data")
         episode_data = self.get_episode_data(get_default=False)
         step = 0 if len(episode_data) == 0 else episode_data[-1]["GlobalStep"]
 
@@ -178,6 +179,7 @@ class BaseAgent(metaclass=ABCMeta):
             "Result": result_id,
             "OppID": self.ai.opponent_id,
             "ActionDistribution": action_distribution,
+            "MapName": self.ai.game_info.map_name,
         }
         if len(self.all_episode_data) >= 1:
             self.all_episode_data.append(episode_info)

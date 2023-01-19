@@ -5,6 +5,9 @@ RL Training (back propagation) should then be carried out via a separate process
     after the game is complete
 """
 import os
+import pickle
+import time
+
 from os import path
 from typing import Dict, List
 
@@ -25,6 +28,7 @@ from sc2.units import Units
 
 from loguru import logger
 import uuid
+from filelock import FileLock
 
 NUM_ENVS: int = 1
 SPATIAL_SHAPE: tuple[int, int, int, int] = (1, 38, 120, 120)
@@ -193,28 +197,16 @@ class OfflineAgent(BaseAgent):
                     self.rewards[step] = self.reward
                     self.squad_reward = 0.0
                 else:
+                    self._save_tensors()
                     self.current_rollout_step = 0
-                    torch.save(
-                        {
-                            "entities": self.entities,
-                            "scalars": self.scalars,
-                            "spatials": self.spatials,
-                            "locations": self.locations,
-                            "actions": self.actions,
-                            "logprobs": self.logprobs,
-                            "rewards": self.rewards,
-                            "dones": self.dones,
-                            "values": self.values,
-                        },
-                        f"{self.save_tensors_path}tensors_{self.data_chunk}.pt",
-                    )
-                    self.data_chunk += 1
+
             return action.item()
 
     def on_episode_end(self, result):
         if self.training_active:
             logger.info("On episode end called")
             _reward = 5.0 if result == Result.Victory else -5.0
+
             self.store_episode_data(
                 result,
                 self.epoch,
@@ -226,5 +218,32 @@ class OfflineAgent(BaseAgent):
             if current_step == self.num_rollout_steps:
                 current_step = self.num_rollout_steps - 1
             self.rewards[current_step] = _reward
-            self.dones[current_step] = 1
-            # TODO: Store things to disk
+            self.dones[current_step] = 1.0
+            self._save_tensors()
+
+            time.sleep(1)
+
+    def _save_tensors(self) -> None:
+
+        file_name = f"{self.save_tensors_path}{self.data_chunk}_tensors.pt"
+        with open(file_name, "wb") as f:
+            try:
+                torch.save(
+                    {
+                        "entities": self.entities,
+                        "scalars": self.scalars,
+                        "spatials": self.spatials,
+                        "locations": self.locations,
+                        "actions": self.actions,
+                        "logprobs": self.logprobs,
+                        "rewards": self.rewards,
+                        "dones": self.dones,
+                        "values": self.values,
+                    },
+                    f,
+                    pickle_protocol=pickle.HIGHEST_PROTOCOL,
+                )
+            finally:
+                f.flush()
+                os.fsync(f.fileno())
+        self.data_chunk += 1
