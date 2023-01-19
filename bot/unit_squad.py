@@ -63,7 +63,11 @@ class UnitSquad:
     def update_action(
         self, action: AbilityId, position: Point2, stutter_forward: bool = False
     ) -> None:
-        if action != self.current_action or position != self.current_action_position:
+        if (
+            action != self.current_action
+            or position != self.current_action_position
+            or stutter_forward != self.stutter_forward
+        ):
             self.current_action = action
             self.current_action_position = position
             self.stutter_forward = stutter_forward

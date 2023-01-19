@@ -2,6 +2,7 @@
 Create and manage unit squad bookkeeping.
 Note: squad actions are carried out in `unit_squad.py`
 """
+import itertools
 import uuid
 from typing import Set, Dict, Any, List, Optional, Callable
 
@@ -15,8 +16,15 @@ from bot.modules.unit_roles import UnitRoles
 from bot.squad_agent.base_agent import BaseAgent
 from bot.unit_squad import UnitSquad
 from sc2.ids.ability_id import AbilityId
+from sc2.ids.unit_typeid import UnitTypeId
 from sc2.position import Point2
 from sc2.units import Units
+
+CREEP_TUMOR_TYPES: Set[UnitTypeId] = {
+    UnitTypeId.CREEPTUMOR,
+    UnitTypeId.CREEPTUMORQUEEN,
+    UnitTypeId.CREEPTUMORBURROWED,
+}
 
 
 class UnitSquads:
@@ -35,6 +43,8 @@ class UnitSquads:
         "SQUAD_OBJECT",
         "SQUAD_RADIUS",
         "TAGS",
+        "expansions_generator",
+        "next_base_location",
     )
 
     def __init__(
@@ -82,6 +92,9 @@ class UnitSquads:
                 False,
             ),
         }
+
+        self.expansions_generator = None
+        self.next_base_location: Optional[Point2] = None
 
         # How often we get a new squad action (22.4 FPS)
         self.AGENT_FRAME_SKIP: int = 20
@@ -136,25 +149,31 @@ class UnitSquads:
             if squad.squad_id == id_of_largest_squad:
                 # update the action once every 20 frames (just under once per second (in-game time))
                 if iteration % (self.AGENT_FRAME_SKIP // self.ai.client.game_step) == 0:
-                    action: int = self.agent.choose_action(
-                        self.squads,
-                        pos_of_largest_squad,
-                        self.ai.all_enemy_units.filter(
-                            lambda u: u.distance_to(pos_of_largest_squad) < 15.0
-                        ),
-                        squad.squad_units,
-                        self.attack_target,
-                        self.rally_point,
-                    )
-                    logger.info(
-                        f"{self.ai.time_formatted} Chosen action: {SQUAD_ACTIONS[action]}"
-                    )
-                    action_type: SquadActionType = SQUAD_ACTIONS[action]
-                    if action_type in self.action_to_arguments:
-                        squad.update_action(*self.action_to_arguments[action_type]())
-                    # Stim maintains previous action, we
-                    elif action_type == SquadActionType.STIM:
-                        squad.set_stim_status(True)
+                    # after 30 minutes, just attack regardless to simplify things
+                    if self.ai.time > 1800.0:
+                        squad.update_action(AbilityId.ATTACK, self.attack_target)
+                    else:
+                        action: int = self.agent.choose_action(
+                            self.squads,
+                            pos_of_largest_squad,
+                            self.ai.all_enemy_units.filter(
+                                lambda u: u.distance_to(pos_of_largest_squad) < 15.0
+                            ),
+                            squad.squad_units,
+                            self.attack_target,
+                            self.rally_point,
+                        )
+                        logger.info(
+                            f"{self.ai.time_formatted} Chosen action: {SQUAD_ACTIONS[action]}"
+                        )
+                        action_type: SquadActionType = SQUAD_ACTIONS[action]
+                        if action_type in self.action_to_arguments:
+                            squad.update_action(
+                                *self.action_to_arguments[action_type]()
+                            )
+                        # Stim maintains previous action, we
+                        elif action_type == SquadActionType.STIM:
+                            squad.set_stim_status(True)
             else:
                 squad.update_action(AbilityId.ATTACK, pos_of_largest_squad)
 
@@ -360,10 +379,28 @@ class UnitSquads:
                 self.attack_target = center_mass
 
         # then anything else
-        if enemy_structures := self.ai.enemy_structures:
+        if enemy_structures := self.ai.enemy_structures.filter(
+            lambda s: s.type_id not in CREEP_TUMOR_TYPES
+        ):
             self.attack_target = enemy_structures.closest_to(
                 self.ai.game_info.map_center
             ).position
 
         else:
-            self.attack_target = self.ai.enemy_start_locations[0]
+            if self.ai.time < 600.0:
+                self.attack_target = self.ai.enemy_start_locations[0]
+            else:
+                if not self.expansions_generator:
+                    base_locations: list[Point2] = [
+                        el[0] for el in self.terrain.expansion_distances
+                    ]
+                    base_locations.append(self.ai.enemy_start_locations[0])
+                    self.expansions_generator = itertools.cycle(base_locations)
+                    self.next_base_location = next(self.expansions_generator)
+
+                if self.next_base_location and self.ai.is_visible(
+                    self.next_base_location
+                ):
+                    self.next_base_location = next(self.expansions_generator)
+
+                self.attack_target = self.next_base_location
