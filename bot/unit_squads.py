@@ -394,7 +394,7 @@ class UnitSquads:
             if self.ai.time < 600.0:
                 self.attack_target = self.ai.enemy_start_locations[0]
             else:
-                if not self.expansions_generator:
+                if not hasattr(self, "expansions_generator"):
                     base_locations: list[Point2] = [
                         el[0] for el in self.terrain.expansion_distances
                     ]

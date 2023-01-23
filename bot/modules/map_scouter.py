@@ -55,8 +55,9 @@ class MapScouter:
         if steal_from := self.unit_roles.get_units_from_role(
             UnitRoleTypes.ATTACKING, UnitTypeId.MARINE
         ):
-            marine: Unit = steal_from.closest_to(self.ai.start_location)
-            self.unit_roles.assign_role(marine.tag, UnitRoleTypes.MAP_SCOUTER)
+            if len(steal_from) > 20:
+                marine: Unit = steal_from.closest_to(self.ai.start_location)
+                self.unit_roles.assign_role(marine.tag, UnitRoleTypes.MAP_SCOUTER)
 
     def _scout_map(self, scout: Unit) -> None:
         if self.next_base_location and self.ai.is_visible(self.next_base_location):

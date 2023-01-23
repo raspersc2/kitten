@@ -20,7 +20,6 @@ class UnitSquad:
         "current_action_position",
         "stutter_forward",
         "stuttering",
-        "action_updated_this_step",
         "stim_next_step",
         "stim_locked_till",
         "STIM_DURATION",
@@ -40,7 +39,6 @@ class UnitSquad:
         # if we store this, then the stutter action is only issued once
         self.stuttering: bool = False
 
-        self.action_updated_this_step: bool = False
         self.stim_next_step: bool = False
         self.stim_locked_till: float = 0.0
         self.STIM_DURATION: float = 11.0
@@ -64,22 +62,17 @@ class UnitSquad:
     def update_action(
         self, action: AbilityId, position: Point2, stutter_forward: bool = False
     ) -> None:
-        if (
-            action != self.current_action
-            or position != self.current_action_position
-            or stutter_forward != self.stutter_forward
-        ):
-            self.current_action = action
-            self.current_action_position = position
-            self.stutter_forward = stutter_forward
-            self.action_updated_this_step = True
+        self.current_action = action
+        self.current_action_position = position
+        self.stutter_forward = stutter_forward
 
     async def do_action(
         self, squad_tags: Set[int], pathing: Pathing, main_squad: bool = False
     ) -> None:
         # currently only main squad uses RL agent, all other squads have scripted logic
-        if not main_squad and self.ai.time > self.action_locked_till:
-            await self._do_scripted_squad_action(squad_tags)
+        if not main_squad:
+            if self.ai.time > self.action_locked_till:
+                await self._do_scripted_squad_action(squad_tags)
         else:
             if self.stim_next_step:
                 self.stim_next_step = False
@@ -165,7 +158,13 @@ class UnitSquad:
             self.stuttering = True
             pos: Point2
             if self.stutter_forward:
-                pos = self.current_action_position
+                center: Point2 = self.squad_units.center
+                if close_enemies := self.ai.enemy_units.filter(
+                    lambda u: u.distance_to(center)
+                ):
+                    pos = close_enemies.center
+                else:
+                    pos = self.current_action_position
             else:
                 # get a path back home, and kite back using that
                 pos = pathing.find_path_next_point(
