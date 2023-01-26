@@ -1,6 +1,7 @@
 from typing import Dict, Set, Union
 
 from sc2.ids.ability_id import AbilityId
+from sc2.ids.unit_typeid import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
 from sc2.position import Point2
 from sc2.unit import Unit
@@ -71,7 +72,9 @@ class UnitSquad:
     ) -> None:
         # currently only main squad uses RL agent, all other squads have scripted logic
         if not main_squad:
-            if self.ai.time > self.action_locked_till:
+            if self.ai.time > self.action_locked_till or self.squad_units(
+                UnitTypeId.MEDIVAC
+            ):
                 await self._do_scripted_squad_action(squad_tags)
         else:
             if self.stim_next_step:
