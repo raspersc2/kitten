@@ -45,7 +45,7 @@ class BaseAgent(metaclass=ABCMeta):
         "PLOT_TITLES",
     )
 
-    def __init__(self, ai: BotAI, config: Dict, device: str = "cuda"):
+    def __init__(self, ai: BotAI, config: Dict, device: str = "cpu"):
         super().__init__()
         self.ai: BotAI = ai
         self.config: Dict = config
@@ -159,6 +159,7 @@ class BaseAgent(metaclass=ABCMeta):
                     "OppID": self.ai.opponent_id,
                     "ActionDistribution": [],
                     "MapName": self.ai.game_info.map_name,
+                    "Loss": 0.0,
                 }
             ]
         else:
@@ -166,7 +167,9 @@ class BaseAgent(metaclass=ABCMeta):
         self.all_episode_data = episode_data
         return episode_data
 
-    def store_episode_data(self, result, steps, reward, action_distribution) -> None:
+    def store_episode_data(
+        self, result, steps, reward, action_distribution, loss=0.0
+    ) -> None:
         logger.info("Storing episode data")
         episode_data = self.get_episode_data(get_default=False)
         step = 0 if len(episode_data) == 0 else episode_data[-1]["GlobalStep"]
@@ -181,6 +184,7 @@ class BaseAgent(metaclass=ABCMeta):
             "OppID": self.ai.opponent_id,
             "ActionDistribution": action_distribution,
             "MapName": self.ai.game_info.map_name,
+            "Loss": loss,
         }
         if len(self.all_episode_data) >= 1:
             self.all_episode_data.append(episode_info)

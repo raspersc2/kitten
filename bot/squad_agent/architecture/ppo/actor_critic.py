@@ -6,9 +6,9 @@ from torch.distributions import Categorical
 
 # relative import required for training with docker
 try:
-    from bot.squad_agent.architecture.encoder import Encoder
+    from bot.squad_agent.architecture.encoding import Encoder
 except ImportError:
-    from ...squad_agent.architecture.encoder import Encoder
+    from ...architecture.encoding.encoder import Encoder
 
 
 def layer_init(

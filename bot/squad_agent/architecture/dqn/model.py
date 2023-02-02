@@ -9,9 +9,9 @@ from torch import nn, Tensor
 # relative import required for training with docker
 try:
     from bot.squad_agent.architecture.dqn.dqn_model import Network
-    from bot.squad_agent.architecture.encoder import Encoder
+    from bot.squad_agent.architecture.encoding.encoder import Encoder
 except ImportError:
-    from ...architecture.encoder import Encoder
+    from ...architecture.encoding.encoder import Encoder
     from ...architecture.dqn.dqn_model import Network
 
 
@@ -44,7 +44,7 @@ class Model(nn.Module):
 
     def forward(self, state: Tensor) -> Tensor:
         """Forward method implementation.
-        Note, state here should be the output from the encoder
+        Note, state here should be the output from the encoding
         """
         dist = self.dqn.dist(state)
         q = torch.sum(dist * self.support, dim=2)
