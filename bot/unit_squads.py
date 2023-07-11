@@ -17,7 +17,7 @@ from bot.consts import SQUAD_ACTIONS, TOWNHALL_TYPES, SquadActionType, UnitRoleT
 from bot.modules.pathing import Pathing
 from bot.modules.terrain import Terrain
 from bot.modules.unit_roles import UnitRoles
-from bot.squad_agent.base_agent import BaseAgent
+from bot.squad_agent.agents.base_agent import BaseAgent
 from bot.unit_squad import UnitSquad
 
 CREEP_TUMOR_TYPES: Set[UnitTypeId] = {

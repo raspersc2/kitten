@@ -21,8 +21,8 @@ from torch import nn, optim
 from bot.botai_ext import BotAIExt
 from bot.consts import SQUAD_ACTIONS, ConfigSettings
 from bot.modules.pathing import Pathing
-from bot.squad_agent.architecture.actor_critic import ActorCritic
-from bot.squad_agent.base_agent import BaseAgent
+from bot.squad_agent.agents.base_agent import BaseAgent
+from bot.squad_agent.architecture.ppo.actor_critic import ActorCritic
 from bot.squad_agent.features import Features
 from bot.squad_agent.utils import load_checkpoint, save_checkpoint
 
@@ -80,7 +80,7 @@ class OfflineAgent(BaseAgent):
         ).to(self.device)
         self.optimizer = optim.AdamW(self.model.parameters(), lr=2.5e-4, eps=1e-5)
         if path.isfile(self.CHECKPOINT_PATH):
-            self.model, self.optimizer, self.epoch = load_checkpoint(
+            self.model, self.optimizer, self.epoch, _, _ = load_checkpoint(
                 self.CHECKPOINT_PATH, self.model, self.optimizer, self.device
             )
             logger.info(f"Loaded existing model at {self.CHECKPOINT_PATH}")
@@ -161,7 +161,6 @@ class OfflineAgent(BaseAgent):
         entity = nn.functional.normalize(entity)
 
         self.cumulative_reward += reward
-
         with torch.no_grad():
             (
                 action,
@@ -219,8 +218,6 @@ class OfflineAgent(BaseAgent):
             self.rewards[current_step] = _reward
             self.dones[current_step] = 1.0
             self._save_tensors()
-
-            time.sleep(1)
 
     def _save_tensors(self) -> None:
 

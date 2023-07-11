@@ -84,7 +84,7 @@ class PPOTrainer:
         self.epoch: int = 0
 
         if path.isfile(self.CHECKPOINT_PATH):
-            self.model, self.optimizer, self.epoch = load_checkpoint(
+            self.model, self.optimizer, self.epoch, _, _ = load_checkpoint(
                 self.CHECKPOINT_PATH, self.model, self.optimizer, self.device
             )
             logger.info(f"Loaded existing model at {self.CHECKPOINT_PATH}")

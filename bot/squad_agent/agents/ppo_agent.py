@@ -18,8 +18,8 @@ from torch import Tensor, nn, optim
 from bot.botai_ext import BotAIExt
 from bot.consts import SQUAD_ACTIONS, ConfigSettings
 from bot.modules.pathing import Pathing
-from bot.squad_agent.architecture.actor_critic import ActorCritic
-from bot.squad_agent.base_agent import BaseAgent
+from bot.squad_agent.agents.base_agent import BaseAgent
+from bot.squad_agent.architecture.ppo.actor_critic import ActorCritic
 from bot.squad_agent.features import Features
 from bot.squad_agent.utils import load_checkpoint, save_checkpoint
 

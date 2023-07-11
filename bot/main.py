@@ -14,10 +14,12 @@ from bot.modules.pathing import Pathing
 from bot.modules.terrain import Terrain
 from bot.modules.unit_roles import UnitRoles
 from bot.modules.workers import WorkersManager
-from bot.squad_agent.base_agent import BaseAgent
-from bot.squad_agent.offline_agent import OfflineAgent
-from bot.squad_agent.ppo_agent import PPOAgent
-from bot.squad_agent.random_agent import RandomAgent
+from bot.squad_agent.agents.base_agent import BaseAgent
+from bot.squad_agent.agents.dqn_agent import DQNAgent
+from bot.squad_agent.agents.dqn_rainbow_agent import DQNRainbowAgent
+from bot.squad_agent.agents.offline_agent import OfflineAgent
+from bot.squad_agent.agents.ppo_agent import PPOAgent
+from bot.squad_agent.agents.random_agent import RandomAgent
 from bot.state import State
 from bot.unit_squads import UnitSquads
 from MapAnalyzer.MapData import MapData
@@ -69,12 +71,19 @@ class Kitten(BotAIExt):
         agent_class: str = self.config[ConfigSettings.SQUAD_AGENT][
             ConfigSettings.AGENT_CLASS
         ]
-        if agent_class == AgentClass.OFFLINE_AGENT:
-            self.agent = OfflineAgent(self, self.config, self.pathing)
-        elif agent_class == AgentClass.PPO_AGENT:
-            self.agent = PPOAgent(self, self.config, self.pathing)
-        else:
-            self.agent = RandomAgent(self, self.config, self.pathing)
+        try:
+            if agent_class == AgentClass.OFFLINE_AGENT:
+                self.agent = OfflineAgent(self, self.config, self.pathing)
+            elif agent_class == AgentClass.PPO_AGENT:
+                self.agent = PPOAgent(self, self.config, self.pathing)
+            elif agent_class == AgentClass.DQN_AGENT:
+                self.agent = DQNAgent(self, self.config, self.pathing)
+            elif agent_class == AgentClass.DQN_RAINBOW_AGENT:
+                self.agent = DQNRainbowAgent(self, self.config, self.pathing)
+            elif agent_class == AgentClass.RANDOM_AGENT:
+                self.agent = RandomAgent(self, self.config, self.pathing)
+        except ValueError:
+            raise ValueError("Invalid AgentClass name in config.yaml")
 
         self.macro = Macro(
             self, self.unit_roles, self.workers_manager, self.map_data, self.debug
@@ -90,12 +99,9 @@ class Kitten(BotAIExt):
             self.unit_roles.assign_role(worker.tag, UnitRoleTypes.GATHERING)
 
     async def on_step(self, iteration: int) -> None:
-        # unit_position_list: List[List[float]] = [
-        #     [unit.position.x, unit.position.y] for unit in self.enemy_units
-        # ]
-        # if unit_position_list:
-        #     self.enemy_tree = KDTree(unit_position_list)
 
+        if self.time > 1200.0:
+            await self.client.leave()
         state: State = State(self)
         await self.unit_squads.update(iteration, self.pathing)
         await self.macro.update(state, iteration)
@@ -105,11 +111,7 @@ class Kitten(BotAIExt):
         if self.time > 60.0:
             self.pathing.update(iteration)
 
-        if (
-            self.time > 5.0
-            and not self.sent_chat
-            and isinstance(self.agent, OfflineAgent)
-        ):
+        if self.time > 5.0 and not self.sent_chat:
             num_episodes: int = len(self.agent.all_episode_data)
             await self.chat_send(
                 f"Meow! This kitty has trained for {num_episodes} episodes (happy)"

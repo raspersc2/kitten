@@ -16,6 +16,8 @@ TOWNHALL_TYPES: set[UnitTypeId] = {
 
 
 class AgentClass(str, Enum):
+    DQN_AGENT = "DQNAgent"
+    DQN_RAINBOW_AGENT = "DQNRainbowAgent"
     OFFLINE_AGENT = "OfflineAgent"
     PPO_AGENT = "PPOAgent"
     RANDOM_AGENT = "RandomAgent"
@@ -23,23 +25,33 @@ class AgentClass(str, Enum):
 
 class ConfigSettings(str, Enum):
     AGENT_CLASS = "AgentClass"
+    ALPHA = "Alpha"
+    ATOM_SIZE = "AtomSize"
     BATCH_SIZE = "BatchSize"
+    BETA = "Beta"
     CHECKPOINT_NAME = "CheckPointName"
     CLIP_COEFFICIENT = "ClipCoefficient"
     DATA_DIRECTORY = "DataDirectory"
     DEBUG = "Debug"
+    DQN = "DQN"
     ENTROPY_COEFFICIENT = "EntropyCoefficient"
     GAE_LAMBDA = "GaeLambda"
     GAMMA = "Gamma"
     GAME_STEP = "GameStep"
     INFERENCE_MODE = "InferenceMode"
+    LEARNING_RATE = "LearningRate"
     MAX_GRAD_NORM = "MaxGradNorm"
+    MEMORY_SIZE = "MemorySize"
     NUM_ROLLOUT_STEPS = "NumRolloutSteps"
     PPO = "PPO"
+    PRIOR_EPS = "PriorEps"
     STATE_DIRECTORY = "StateDirectory"
     SQUAD_AGENT = "SquadAgent"
+    TARGET_UPDATE = "TargetUpdate"
     UPDATE_POLICY_EPOCHS = "UpdatePolicyEpochs"
     VF_COEFFICIENT = "VFCoefficient"
+    V_MIN = "VMin"
+    V_MAX = "VMax"
     VISUALIZE_SPATIAL_FEATURES = "VisualizeSpatialFeatures"
 
 

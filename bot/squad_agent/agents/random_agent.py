@@ -8,7 +8,7 @@ from sc2.position import Point2
 from sc2.units import Units
 
 from bot.modules.pathing import Pathing
-from bot.squad_agent.base_agent import BaseAgent
+from bot.squad_agent.agents.base_agent import BaseAgent
 
 
 class RandomAgent(BaseAgent):

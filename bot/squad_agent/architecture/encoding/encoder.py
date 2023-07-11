@@ -14,13 +14,13 @@ from torch import (
 )
 from torchvision.transforms.functional import resize
 
-# relative import required for training with docker
 try:
-    from bot.squad_agent.architecture.entity_encoder import EntityEncoder
-    from bot.squad_agent.architecture.spatial_encoder import SpatialEncoder
+    from bot.squad_agent.architecture.encoding.entity_encoder import EntityEncoder
+    from bot.squad_agent.architecture.encoding.spatial_encoder import SpatialEncoder
+# relative import required for training with docker
 except ImportError:
-    from ...squad_agent.architecture.entity_encoder import EntityEncoder
-    from ...squad_agent.architecture.spatial_encoder import SpatialEncoder
+    from .entity_encoder import EntityEncoder
+    from .spatial_encoder import SpatialEncoder
 
 from torch.nn.functional import relu
 
