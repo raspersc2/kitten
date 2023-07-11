@@ -77,6 +77,7 @@ class BaseAgent(metaclass=ABCMeta):
             self.DATA_DIR,
             config[ConfigSettings.SQUAD_AGENT][ConfigSettings.CHECKPOINT_NAME],
         )
+
         self.training_active: bool = not config[ConfigSettings.SQUAD_AGENT][
             ConfigSettings.INFERENCE_MODE
         ]

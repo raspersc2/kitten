@@ -16,6 +16,7 @@ from bot.modules.unit_roles import UnitRoles
 from bot.modules.workers import WorkersManager
 from bot.squad_agent.agents.base_agent import BaseAgent
 from bot.squad_agent.agents.dqn_agent import DQNAgent
+from bot.squad_agent.agents.dqn_rainbow_agent import DQNRainbowAgent
 from bot.squad_agent.agents.offline_agent import OfflineAgent
 from bot.squad_agent.agents.ppo_agent import PPOAgent
 from bot.squad_agent.agents.random_agent import RandomAgent
@@ -77,6 +78,8 @@ class Kitten(BotAIExt):
                 self.agent = PPOAgent(self, self.config, self.pathing)
             elif agent_class == AgentClass.DQN_AGENT:
                 self.agent = DQNAgent(self, self.config, self.pathing)
+            elif agent_class == AgentClass.DQN_RAINBOW_AGENT:
+                self.agent = DQNRainbowAgent(self, self.config, self.pathing)
             elif agent_class == AgentClass.RANDOM_AGENT:
                 self.agent = RandomAgent(self, self.config, self.pathing)
         except ValueError:
@@ -96,6 +99,9 @@ class Kitten(BotAIExt):
             self.unit_roles.assign_role(worker.tag, UnitRoleTypes.GATHERING)
 
     async def on_step(self, iteration: int) -> None:
+
+        if self.time > 1200.0:
+            await self.client.leave()
         state: State = State(self)
         await self.unit_squads.update(iteration, self.pathing)
         await self.macro.update(state, iteration)

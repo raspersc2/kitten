@@ -4,15 +4,15 @@ This makes saving and loading the model simpler
 """
 import numpy as np
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 
 # relative import required for training with docker
 try:
-    from bot.squad_agent.architecture.dqn.dqn_model import Network
+    from bot.squad_agent.architecture.dqn_rainbow.dqn_model import Network
     from bot.squad_agent.architecture.encoding.encoder import Encoder
 except ImportError:
+    from ...architecture.dqn_rainbow.dqn_model import Network
     from ...architecture.encoding.encoder import Encoder
-    from ...architecture.dqn.dqn_model import Network
 
 
 class Model(nn.Module):
@@ -25,13 +25,14 @@ class Model(nn.Module):
         action_dim: int,
         support: Tensor,
         device,
+        atom_size,
     ) -> None:
         super(Model, self).__init__()
-        self.atom_size: int = 128
+        self.atom_size: int = atom_size
         self.support: Tensor = support
         self.encoder = Encoder(device, grid, y, x)
 
-        # networks: dqn, dqn_target
+        # networks: dqn_rainbow, dqn_target
         self.dqn = Network(obs_dim, action_dim, self.atom_size, support).to(device)
         self.dqn_target = Network(obs_dim, action_dim, self.atom_size, support).to(
             device

@@ -1,12 +1,12 @@
-from collections import deque
 import random
-from typing import Deque, Tuple, Dict, List
+from collections import deque
+from typing import Deque, Dict, List, Tuple
 
 import numpy as np
 import torch
 from torch import Tensor
 
-from bot.squad_agent.architecture.dqn.segment_tree import SumSegmentTree, MinSegmentTree
+from bot.squad_agent.architecture.dqn_rainbow.segment_tree import MinSegmentTree, SumSegmentTree
 
 
 class ReplayBuffer:

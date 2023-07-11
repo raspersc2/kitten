@@ -6,7 +6,7 @@ GameStep: 4
 VisualizeSpatialFeatures: False
 SquadAgent:
   # DQNAgent, OfflineAgent, PPOAgent, RandomAgent
-  AgentClass: "DQNAgent"
+  AgentClass: "DQNRainbowAgent"
   CheckPointName: "checkpoint.pt"
   InferenceMode: False
   NumRolloutSteps: 64
@@ -26,17 +26,17 @@ SquadAgent:
     UpdatePolicyEpochs: 4
     VFCoefficient: 0.5
 
-  # setting specific to DQN (used in `dqn_agent.py`)
+  # setting specific to DQN (used in `dqn_rainbow_agent.py`)
   DQN:
-    Alpha: 0.2
-    AtomSize: 128
-    BatchSize: 64
-    Beta: 0.6
+    Alpha: 0.6
+    AtomSize: 71
+    BatchSize: 32
+    Beta: 0.4
     Gamma: 0.99
-    LearningRate: 0.0001
+    LearningRate: 0.000001
     MemorySize: 1000
     PriorEps: 0.000001
-    TargetUpdate: 150
+    TargetUpdate: 1000
     VMin: 0.0
     VMax: 200.0
 

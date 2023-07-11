@@ -1,4 +1,4 @@
-from enum import Enum, auto, EnumMeta
+from enum import Enum, auto
 from typing import Dict, Set
 
 from sc2.ids.effect_id import EffectId
@@ -17,6 +17,7 @@ TOWNHALL_TYPES: set[UnitTypeId] = {
 
 class AgentClass(str, Enum):
     DQN_AGENT = "DQNAgent"
+    DQN_RAINBOW_AGENT = "DQNRainbowAgent"
     OFFLINE_AGENT = "OfflineAgent"
     PPO_AGENT = "PPOAgent"
     RANDOM_AGENT = "RandomAgent"
