@@ -83,6 +83,7 @@ class UnitRoleTypes(Enum):
     GATHERING = auto()
     MAP_SCOUTER = auto()
     WORKER_DEFENDER = auto()
+    WORKER_SCOUTER = auto()
 
 
 WORKERS_DEFEND_AGAINST: Set[UnitTypeId] = {

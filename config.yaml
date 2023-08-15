@@ -5,8 +5,8 @@ GameStep: 4
 # This shows exactly what will be passed through the conv layers
 VisualizeSpatialFeatures: False
 SquadAgent:
-  # DQNAgent, OfflineAgent, PPOAgent, RandomAgent
-  AgentClass: "DQNRainbowAgent"
+  # DQNAgent, OfflineAgent, PPOAgent, RandomAgent, DQNRainbowAgent
+  AgentClass: "OfflineAgent"
   CheckPointName: "checkpoint.pt"
   InferenceMode: False
   NumRolloutSteps: 64

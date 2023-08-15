@@ -15,7 +15,7 @@ class EntityEncoder(nn.Module):
         self.device = device
         self.embed = layer_init(nn.Linear(406, 128))
         self.tf_layer = nn.TransformerEncoderLayer(128, 2, batch_first=True)
-        self.tf = nn.TransformerEncoder(self.tf_layer, 4)
+        self.tf = nn.TransformerEncoder(self.tf_layer, 4, enable_nested_tensor=False)
         self.conv1 = nn.Conv1d(128, 128, kernel_size=1, stride=1, padding=0, bias=True)
         self.fc1 = layer_init(nn.Linear(128, 32))
         self.embed_fc = layer_init(nn.Linear(128, 32))
@@ -50,7 +50,7 @@ class EntityEncoder(nn.Module):
         #   So left them out for now. Need to research this properly
         out = self.tf(x, src_key_padding_mask=mask)
         entities_scatter = relu(self.fc1(out))
-
+        # out is wrong size
         masked_out = out * mask.unsqueeze(dim=2)
         z = masked_out.sum(dim=1, keepdim=False)
         z = z / entity_num.unsqueeze(dim=1)

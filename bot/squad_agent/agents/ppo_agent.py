@@ -208,6 +208,7 @@ class PPOAgent(BaseAgent):
                     self.actions[step] = action
                     self.logprobs[step] = logprob
                     self.rewards[step] = self.reward
+                    self.values[step] = value
                     self.squad_reward = 0.0
                 else:
                     # load the up-to-date model,

@@ -6,7 +6,6 @@ process / script after the game is complete
 """
 import os
 import pickle
-import time
 import uuid
 from os import path
 from typing import Dict, List
@@ -193,6 +192,7 @@ class OfflineAgent(BaseAgent):
                     self.actions[step] = action
                     self.logprobs[step] = logprob
                     self.rewards[step] = self.reward
+                    self.values[step] = value
                     self.squad_reward = 0.0
                 else:
                     self._save_tensors()
@@ -204,20 +204,20 @@ class OfflineAgent(BaseAgent):
         if self.training_active:
             logger.info("On episode end called")
             _reward = 5.0 if result == Result.Victory else -5.0
+            if sum(self.action_distribution) > 0:
+                self.store_episode_data(
+                    result,
+                    self.epoch,
+                    self.cumulative_reward + _reward,
+                    self.action_distribution,
+                )
 
-            self.store_episode_data(
-                result,
-                self.epoch,
-                self.cumulative_reward + _reward,
-                self.action_distribution,
-            )
-
-            current_step: int = self.current_rollout_step
-            if current_step == self.num_rollout_steps:
-                current_step = self.num_rollout_steps - 1
-            self.rewards[current_step] = _reward
-            self.dones[current_step] = 1.0
-            self._save_tensors()
+                current_step: int = self.current_rollout_step
+                if current_step == self.num_rollout_steps:
+                    current_step = self.num_rollout_steps - 1
+                self.rewards[current_step] = _reward
+                self.dones[current_step] = 1.0
+                self._save_tensors()
 
     def _save_tensors(self) -> None:
 

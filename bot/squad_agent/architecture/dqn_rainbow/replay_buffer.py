@@ -6,7 +6,10 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from bot.squad_agent.architecture.dqn_rainbow.segment_tree import MinSegmentTree, SumSegmentTree
+from bot.squad_agent.architecture.dqn_rainbow.segment_tree import (
+    MinSegmentTree,
+    SumSegmentTree,
+)
 
 
 class ReplayBuffer:

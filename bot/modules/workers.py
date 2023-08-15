@@ -31,6 +31,7 @@ class WorkersManager:
         "worker_defence_tags",
         "long_distance_mfs",
         "locked_action_tags",
+        "issued_scout_commands",
     )
 
     def __init__(self, ai: BotAI, unit_roles: UnitRoles, terrain: Terrain) -> None:
@@ -53,6 +54,7 @@ class WorkersManager:
         self.worker_defence_tags: Set = set()
         self.long_distance_mfs: Units = Units([], self.ai)
         self.locked_action_tags: Dict[int, float] = dict()
+        self.issued_scout_commands: bool = False
 
     @property
     def available_minerals(self) -> Units:
@@ -92,6 +94,8 @@ class WorkersManager:
                 oc(AbilityId.CALLDOWNMULE_CALLDOWNMULE, mf)
 
         self._handle_worker_rush()
+
+        self._handle_worker_scout()
 
     def select_worker(
         self, target_position: Point2, force: bool = False
@@ -474,3 +478,23 @@ class WorkersManager:
                     worker.gather(close_mineral_patch)
                     self.unit_roles.assign_role(worker.tag, UnitRoleTypes.GATHERING)
                 self.worker_defence_tags = set()
+
+    def _handle_worker_scout(self) -> None:
+        if self.ai.time > 20.0 and not self.issued_scout_commands:
+            if worker := self.select_worker(self.ai.start_location):
+                self.issued_scout_commands = True
+                worker.move(
+                    self.ai.enemy_start_locations[0].towards(
+                        self.ai.game_info.map_center, -9.0
+                    )
+                )
+                for el in self.terrain.expansion_distances:
+                    worker.move(el[0], queue=True)
+
+                self.unit_roles.assign_role(worker.tag, UnitRoleTypes.WORKER_SCOUTER)
+                self.remove_worker_from_mineral(worker.tag)
+
+        if scouts := self.unit_roles.get_units_from_role(UnitRoleTypes.WORKER_SCOUTER):
+            for scout in scouts:
+                if scout.is_idle:
+                    self.unit_roles.assign_role(scout.tag, UnitRoleTypes.GATHERING)

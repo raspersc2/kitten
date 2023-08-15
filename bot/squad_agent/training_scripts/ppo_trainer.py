@@ -23,7 +23,7 @@ try:
     from bot.squad_agent.utils import load_checkpoint, save_checkpoint
 except ImportError:
     from ...consts import SQUAD_ACTIONS, ConfigSettings
-    from ...squad_agent.architecture.actor_critic import ActorCritic
+    from ...squad_agent.architecture.ppo.actor_critic import ActorCritic
     from ...squad_agent.utils import load_checkpoint, save_checkpoint
 
 import shutil
