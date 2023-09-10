@@ -1,4 +1,4 @@
-from typing import Dict, Set, Union
+from typing import TYPE_CHECKING, Dict, Set, Union
 
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
@@ -7,8 +7,8 @@ from sc2.position import Point2
 from sc2.unit import Unit
 from sc2.units import Units
 
-from bot.botai_ext import BotAIExt
-from bot.modules.pathing import Pathing
+if TYPE_CHECKING:
+    from ares import AresBot
 
 
 class UnitSquad:
@@ -27,8 +27,8 @@ class UnitSquad:
         "action_locked_till",
     )
 
-    def __init__(self, ai: BotAIExt, squad_id: str, squad_units: Units):
-        self.ai: BotAIExt = ai
+    def __init__(self, ai: "AresBot", squad_id: str, squad_units: Units):
+        self.ai: AresBot = ai
         self.squad_id: str = squad_id
         self.squad_units: Units = squad_units
         self.squad_position: Point2 = squad_units.center
@@ -67,9 +67,7 @@ class UnitSquad:
         self.current_action_position = position
         self.stutter_forward = stutter_forward
 
-    async def do_action(
-        self, squad_tags: Set[int], pathing: Pathing, main_squad: bool = False
-    ) -> None:
+    async def do_action(self, squad_tags: Set[int], main_squad: bool = False) -> None:
         # currently only main squad uses RL agent, all other squads have scripted logic
         if not main_squad:
             if self.ai.time > self.action_locked_till or self.squad_units(
@@ -93,9 +91,9 @@ class UnitSquad:
                             AbilityId.HOLDPOSITION, squad_tags
                         )
                 elif self.current_action == AbilityId.ATTACK:
-                    await self._do_squad_attack_action(squad_tags, pathing)
+                    await self._do_squad_attack_action(squad_tags)
                 else:
-                    await self._do_squad_move_action(squad_tags, pathing)
+                    await self._do_squad_move_action(squad_tags)
 
     async def _do_scripted_squad_action(self, squad_tags: Set[int]) -> None:
         """
@@ -139,9 +137,7 @@ class UnitSquad:
         else:
             return avg_weapon_cooldown > 5.5
 
-    async def _do_squad_attack_action(
-        self, squad_tags: Set[int], pathing: Pathing
-    ) -> None:
+    async def _do_squad_attack_action(self, squad_tags: Set[int]) -> None:
         close_enemy: Dict[int, Units] = self.ai.enemies_in_range(self.squad_units, 15.0)
         should_stutter: bool = self.should_stutter(close_enemy)
         sample_unit: Unit = self.squad_units[0]
@@ -170,27 +166,25 @@ class UnitSquad:
                     pos = self.current_action_position
             else:
                 # get a path back home, and kite back using that
-                pos = pathing.find_path_next_point(
+                pos = self.ai.mediator.find_path_next_point(
                     start=self.squad_position,
                     target=self.ai.start_location,
-                    grid=pathing.ground_grid,
+                    grid=self.ai.mediator.get_ground_grid,
                     sensitivity=8,
                 )
             await self.ai.give_units_same_order(AbilityId.MOVE, squad_tags, pos)
 
-    async def _do_squad_move_action(
-        self, squad_tags: Set[int], pathing: Pathing
-    ) -> None:
+    async def _do_squad_move_action(self, squad_tags: Set[int]) -> None:
         if self.squad_position.distance_to(self.current_action_position) < 3.0:
             return
 
         sample_unit: Unit = self.squad_units[0]
         order_target: Union[int, Point2, None] = sample_unit.order_target
 
-        pos: Point2 = pathing.find_path_next_point(
+        pos: Point2 = self.ai.mediator.find_path_next_point(
             start=self.squad_position,
             target=self.current_action_position,
-            grid=pathing.ground_grid,
+            grid=self.ai.mediator.get_ground_grid,
             sensitivity=6,
         )
         # sample unit is already close to the calculated position

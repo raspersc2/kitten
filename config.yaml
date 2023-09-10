@@ -1,6 +1,6 @@
 DataDirectory: "./data"
 Debug: False
-GameStep: 4
+GameStep: 8
 # Visualize processed spatial information
 # This shows exactly what will be passed through the conv layers
 VisualizeSpatialFeatures: False

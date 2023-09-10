@@ -4,21 +4,21 @@ Note: squad actions are carried out in `unit_squad.py`
 """
 import itertools
 import uuid
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Set
 
+from ares.consts import UnitRole
 from loguru import logger
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.position import Point2
 from sc2.units import Units
 
-from bot.botai_ext import BotAIExt
-from bot.consts import SQUAD_ACTIONS, TOWNHALL_TYPES, SquadActionType, UnitRoleTypes
-from bot.modules.pathing import Pathing
-from bot.modules.terrain import Terrain
-from bot.modules.unit_roles import UnitRoles
+from bot.consts import SQUAD_ACTIONS, TOWNHALL_TYPES, SquadActionType
 from bot.squad_agent.agents.base_agent import BaseAgent
 from bot.unit_squad import UnitSquad
+
+if TYPE_CHECKING:
+    from ares import AresBot
 
 CREEP_TUMOR_TYPES: Set[UnitTypeId] = {
     UnitTypeId.CREEPTUMOR,
@@ -30,9 +30,7 @@ CREEP_TUMOR_TYPES: Set[UnitTypeId] = {
 class UnitSquads:
     __slots__ = (
         "ai",
-        "unit_roles",
         "agent",
-        "terrain",
         "assigned_unit_tags",
         "squads",
         "squads_dict",
@@ -50,14 +48,10 @@ class UnitSquads:
     expansions_generator: Iterator[Any]
     next_base_location: Point2
 
-    def __init__(
-        self, ai: BotAIExt, unit_roles: UnitRoles, agent: BaseAgent, terrain: Terrain
-    ):
+    def __init__(self, ai: "AresBot", agent: BaseAgent):
 
-        self.ai: BotAIExt = ai
-        self.unit_roles: UnitRoles = unit_roles
+        self.ai: AresBot = ai
         self.agent: BaseAgent = agent
-        self.terrain: Terrain = terrain
 
         self.squads: List[UnitSquad] = []
 
@@ -102,12 +96,12 @@ class UnitSquads:
         self.SQUAD_RADIUS: float = 11.0
         self.TAGS: str = "tags"
 
-    async def update(self, iteration: int, pathing: Pathing) -> None:
+    async def update(self, iteration: int) -> None:
         if iteration % 8 == 0:
             self._set_rally_point()
             self._set_attack_target()
 
-        army: Units = self.unit_roles.get_units_from_role(UnitRoleTypes.ATTACKING)
+        army: Units = self.ai.mediator.get_units_from_role(role=UnitRole.ATTACKING)
 
         # handle unit squad assignment not currently in our records
         if unassigned_units := army.tags_not_in(self.assigned_unit_tags):
@@ -120,7 +114,7 @@ class UnitSquads:
 
         # control the unit squads
         if len(self.squads) > 0:
-            await self._handle_squads(iteration, pathing)
+            await self._handle_squads(iteration)
 
     def remove_tag(self, tag: int) -> None:
         """'on_unit_destroyed' calls this"""
@@ -135,7 +129,7 @@ class UnitSquads:
             if found_squad:
                 self._remove_unit_tag(tag, squad_id_to_remove_from)
 
-    async def _handle_squads(self, iteration: int, pathing: Pathing) -> None:
+    async def _handle_squads(self, iteration: int) -> None:
         (
             id_of_largest_squad,
             pos_of_largest_squad,
@@ -179,7 +173,6 @@ class UnitSquads:
 
             await squad.do_action(
                 squad_tags=self.squads_dict[squad.squad_id][self.TAGS],
-                pathing=pathing,
                 main_squad=squad.squad_id == id_of_largest_squad,
             )
 
@@ -369,7 +362,7 @@ class UnitSquads:
         # head towards enemy expansions outside natural by default
         if townhalls := self.ai.enemy_structures.filter(
             lambda s: s.type_id in TOWNHALL_TYPES
-            and s.distance_to(self.terrain.enemy_nat) > 12.0
+            and s.distance_to(self.ai.mediator.get_enemy_nat) > 12.0
             and s.distance_to(self.ai.enemy_start_locations[0]) > 12.0
         ):
             self.attack_target = townhalls.furthest_to(
@@ -396,7 +389,7 @@ class UnitSquads:
             else:
                 if not hasattr(self, "expansions_generator"):
                     base_locations: list[Point2] = [
-                        el[0] for el in self.terrain.expansion_distances
+                        el[0] for el in self.ai.mediator.get_own_expansions
                     ]
                     base_locations.append(self.ai.enemy_start_locations[0])
                     self.expansions_generator = itertools.cycle(base_locations)

@@ -6,11 +6,10 @@ import json
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
 from os import path
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import torch
 from loguru import logger
-from sc2.bot_ai import BotAI
 from sc2.data import Result
 from sc2.position import Point2
 from sc2.unit import Unit
@@ -18,6 +17,9 @@ from sc2.units import Units
 from torch.utils.tensorboard import SummaryWriter
 
 from bot.consts import SQUAD_ACTIONS, ConfigSettings
+
+if TYPE_CHECKING:
+    from ares import AresBot
 
 
 class BaseAgent(metaclass=ABCMeta):
@@ -45,9 +47,9 @@ class BaseAgent(metaclass=ABCMeta):
         "PLOT_TITLES",
     )
 
-    def __init__(self, ai: BotAI, config: Dict, device: str = "cpu"):
+    def __init__(self, ai: "AresBot", config: Dict, device: str = "cpu"):
         super().__init__()
-        self.ai: BotAI = ai
+        self.ai: AresBot = ai
         self.config: Dict = config
         self.DATA_DIR: str = config[ConfigSettings.DATA_DIRECTORY]
 

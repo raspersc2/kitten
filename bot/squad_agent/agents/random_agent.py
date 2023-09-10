@@ -2,17 +2,15 @@ from random import randint
 from typing import Dict, List
 
 from loguru import logger
-from sc2.bot_ai import BotAI
 from sc2.data import Result
 from sc2.position import Point2
 from sc2.units import Units
 
-from bot.modules.pathing import Pathing
 from bot.squad_agent.agents.base_agent import BaseAgent
 
 
 class RandomAgent(BaseAgent):
-    def __init__(self, ai: BotAI, config: Dict, pathing: Pathing) -> None:
+    def __init__(self, ai, config: Dict) -> None:
         super().__init__(ai, config)
 
     def choose_action(

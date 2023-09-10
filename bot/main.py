@@ -1,18 +1,24 @@
-from typing import Dict
+from typing import Dict, List, Optional, Set, Tuple, Union
 
+import numpy as np
 import yaml  # type: ignore
+from ares import AresBot
+from ares.consts import ALL_STRUCTURES
+from ares.dicts.unit_data import UNIT_DATA
+from s2clientprotocol import raw_pb2 as raw_pb
+from s2clientprotocol import sc2api_pb2 as sc_pb
 from sc2.data import Result
 from sc2.ids.ability_id import AbilityId
-from sc2.position import Point3
+from sc2.ids.unit_typeid import UnitTypeId
+from sc2.position import Point2, Point3
 from sc2.unit import Unit
+from sc2.units import Units
+from scipy.spatial import KDTree
 
-from bot.botai_ext import BotAIExt
-from bot.consts import AgentClass, ConfigSettings, UnitRoleTypes
+from ares.consts import UnitRole
+from bot.consts import AgentClass, ConfigSettings
 from bot.modules.macro import Macro
 from bot.modules.map_scouter import MapScouter
-from bot.modules.pathing import Pathing
-from bot.modules.terrain import Terrain
-from bot.modules.unit_roles import UnitRoles
 from bot.modules.workers import WorkersManager
 from bot.squad_agent.agents.base_agent import BaseAgent
 from bot.squad_agent.agents.dqn_agent import DQNAgent
@@ -22,94 +28,82 @@ from bot.squad_agent.agents.ppo_agent import PPOAgent
 from bot.squad_agent.agents.random_agent import RandomAgent
 from bot.state import State
 from bot.unit_squads import UnitSquads
-from MapAnalyzer.MapData import MapData
 
 
-class Kitten(BotAIExt):
+class Kitten(AresBot):
     __slots__ = (
-        "map_data",
-        "unit_roles",
         "unit_squads",
         "workers_manager",
         "macro",
-        "pathing",
         "CONFIG_FILE",
-        "config",
+        "agent_config",
         "debug",
         "sent_chat",
+        "enemy_tree",
     )
 
     agent: BaseAgent
-    map_data: MapData
-    pathing: Pathing
     macro: Macro
     unit_squads: UnitSquads
 
     def __init__(self) -> None:
         super().__init__()
 
-        self.config: Dict = dict()
+        self.agent_config: Dict = dict()
         self.CONFIG_FILE = "config.yaml"
         with open(f"{self.CONFIG_FILE}", "r") as config_file:
-            self.config = yaml.safe_load(config_file)
-        self.debug: bool = self.config[ConfigSettings.DEBUG]
+            self.agent_config = yaml.safe_load(config_file)
+        self.debug: bool = self.agent_config[ConfigSettings.DEBUG]
 
-        self.unit_roles: UnitRoles = UnitRoles(self)
-        self.terrain: Terrain = Terrain(self)
-        self.map_scouter: MapScouter = MapScouter(self, self.unit_roles, self.terrain)
+        self.map_scouter: MapScouter = MapScouter(self)
 
-        self.workers_manager: WorkersManager = WorkersManager(
-            self, self.unit_roles, self.terrain
-        )
+        self.workers_manager: WorkersManager = WorkersManager(self)
         self.sent_chat: bool = False
+        self.enemy_tree: Optional[KDTree] = None
 
     async def on_start(self) -> None:
-        self.map_data = MapData(self)
-        self.pathing = Pathing(self, self.map_data)
+        await super(Kitten, self).on_start()
 
         # TODO: Improve this, handle invalid options in config and don't use if/else
-        agent_class: str = self.config[ConfigSettings.SQUAD_AGENT][
+        agent_class: str = self.agent_config[ConfigSettings.SQUAD_AGENT][
             ConfigSettings.AGENT_CLASS
         ]
         try:
             if agent_class == AgentClass.OFFLINE_AGENT:
-                self.agent = OfflineAgent(self, self.config, self.pathing)
+                self.agent = OfflineAgent(self, self.agent_config)
             elif agent_class == AgentClass.PPO_AGENT:
-                self.agent = PPOAgent(self, self.config, self.pathing)
+                self.agent = PPOAgent(self, self.agent_config)
             elif agent_class == AgentClass.DQN_AGENT:
-                self.agent = DQNAgent(self, self.config, self.pathing)
+                self.agent = DQNAgent(self, self.agent_config)
             elif agent_class == AgentClass.DQN_RAINBOW_AGENT:
-                self.agent = DQNRainbowAgent(self, self.config, self.pathing)
+                self.agent = DQNRainbowAgent(self, self.agent_config)
             elif agent_class == AgentClass.RANDOM_AGENT:
-                self.agent = RandomAgent(self, self.config, self.pathing)
+                self.agent = RandomAgent(self, self.agent_config)
         except ValueError:
             raise ValueError("Invalid AgentClass name in config.yaml")
 
-        self.macro = Macro(
-            self, self.unit_roles, self.workers_manager, self.map_data, self.debug
-        )
-        self.unit_squads = UnitSquads(self, self.unit_roles, self.agent, self.terrain)
-        self.client.game_step = self.config[ConfigSettings.GAME_STEP]
+        self.macro = Macro(self, self.workers_manager, self.debug)
+        self.unit_squads = UnitSquads(self, self.agent)
+        self.client.game_step = self.agent_config[ConfigSettings.GAME_STEP]
         self.client.raw_affects_selection = True
         self.agent.get_episode_data()
 
-        await self.terrain.initialize()
         await self.map_scouter.initialize()
-        for worker in self.workers:
-            self.unit_roles.assign_role(worker.tag, UnitRoleTypes.GATHERING)
 
     async def on_step(self, iteration: int) -> None:
+        await super(Kitten, self).on_step(iteration)
 
         if self.time > 1200.0:
             await self.client.leave()
         state: State = State(self)
-        await self.unit_squads.update(iteration, self.pathing)
+        await self.unit_squads.update(iteration)
         await self.macro.update(state, iteration)
         self.workers_manager.update(state, iteration)
         self.map_scouter.update()
-        # reasonable assumption the pathing module does not need updating early on
-        if self.time > 60.0:
-            self.pathing.update(iteration)
+
+        if iteration % 16 == 0:
+            for depot in self.structures(UnitTypeId.SUPPLYDEPOT):
+                depot(AbilityId.MORPH_SUPPLYDEPOT_LOWER)
 
         if self.time > 5.0 and not self.sent_chat:
             num_episodes: int = len(self.agent.all_episode_data)
@@ -128,27 +122,28 @@ class Kitten(BotAIExt):
             )
 
         if self.debug:
-            height: float = self.get_terrain_z_height(self.terrain.own_nat)
+            height: float = self.get_terrain_z_height(self.mediator.get_own_nat)
             self.client.debug_text_world(
-                "Own nat", Point3((*self.terrain.own_nat, height)), size=11
+                "Own nat", Point3((*self.mediator.get_own_nat, height)), size=11
             )
             self.client.debug_text_world(
-                "Enemy nat", Point3((*self.terrain.enemy_nat, height)), size=11
+                "Enemy nat", Point3((*self.mediator.get_enemy_nat, height)), size=11
             )
             for unit in self.all_units:
                 self.client.debug_text_world(f"{unit.tag}", unit, size=9)
 
     async def on_unit_created(self, unit: Unit) -> None:
-        self.unit_roles.catch_unit(unit)
+        await super(Kitten, self).on_unit_created(unit)
+        if unit.type_id not in {UnitTypeId.MULE, UnitTypeId.SCV}:
+            self.mediator.assign_role(tag=unit.tag, role=UnitRole.ATTACKING)
 
     async def on_unit_destroyed(self, unit_tag: int) -> None:
+        await super(Kitten, self).on_unit_destroyed(unit_tag)
         self.agent.on_unit_destroyed(unit_tag)
         self.unit_squads.remove_tag(unit_tag)
-        self.pathing.remove_unit_tag(unit_tag)
-        self.workers_manager.remove_worker_from_mineral(unit_tag)
-        self.workers_manager.remove_worker_from_vespene(unit_tag)
 
     async def on_unit_took_damage(self, unit: Unit, amount_damage_taken: float) -> None:
+        await super(Kitten, self).on_unit_took_damage(unit, amount_damage_taken)
         if not unit.is_structure:
             return
 
@@ -157,4 +152,171 @@ class Kitten(BotAIExt):
             unit(AbilityId.CANCEL_BUILDINPROGRESS)
 
     async def on_end(self, game_result: Result) -> None:
+        await super(Kitten, self).on_end(game_result)
         self.agent.on_episode_end(game_result)
+
+    def enemies_in_range(self, units: Units, distance: float) -> Dict[int, Units]:
+        """
+        Get all enemies in range of multiple units in one call
+        :param units:
+        :param distance:
+        :return: Dictionary: Key -> Unit tag, Value -> Units in range of that unit
+        """
+        if not self.enemy_tree or not self.enemy_units:
+            return {units[index].tag: Units([], self) for index in range(len(units))}
+
+        unit_positions: List[Point2] = [u.position for u in units]
+        in_range_list: List[Units] = []
+        if unit_positions:
+            query_result = self.enemy_tree.query_ball_point(unit_positions, distance)
+            for result in query_result:
+                in_range_units = Units(
+                    [self.enemy_units[index] for index in result], self
+                )
+                in_range_list.append(in_range_units)
+        return {units[index].tag: in_range_list[index] for index in range(len(units))}
+
+    @staticmethod
+    def center_mass(units: Units, distance: float = 5.0) -> Tuple[Point2, int]:
+        """
+        :param units:
+        :param distance:
+        :return: Position where most units reside, num units at that position
+        """
+        center_mass: Point2 = units[0].position
+        max_num_units: int = 0
+        for unit in units:
+            pos: Point2 = unit.position
+            close: Units = units.closer_than(distance, pos)
+            if len(close) > max_num_units:
+                center_mass = pos
+                max_num_units = len(close)
+
+        return center_mass, max_num_units
+
+    async def give_units_same_order(
+        self,
+        order: AbilityId,
+        unit_tags: Union[List[int], Set[int]],
+        target: Optional[Union[Point2, int]] = None,
+    ) -> None:
+        """
+        Give units corresponding to the given tags the same order.
+        @param order: the order to give to all units
+        @param unit_tags: the tags of the units to give the order to
+        @param target: either a Point2 of the location or the tag of the unit to target
+        """
+        if not target:
+            # noinspection PyProtectedMember
+            await self.client._execute(
+                action=sc_pb.RequestAction(
+                    actions=[
+                        sc_pb.Action(
+                            action_raw=raw_pb.ActionRaw(
+                                unit_command=raw_pb.ActionRawUnitCommand(
+                                    ability_id=order.value,
+                                    unit_tags=unit_tags,
+                                )
+                            )
+                        ),
+                    ]
+                )
+            )
+        elif isinstance(target, Point2):
+            # noinspection PyProtectedMember
+            await self.client._execute(
+                action=sc_pb.RequestAction(
+                    actions=[
+                        sc_pb.Action(
+                            action_raw=raw_pb.ActionRaw(
+                                unit_command=raw_pb.ActionRawUnitCommand(
+                                    ability_id=order.value,
+                                    target_world_space_pos=target.as_Point2D,
+                                    unit_tags=unit_tags,
+                                )
+                            )
+                        ),
+                    ]
+                )
+            )
+        else:
+            # noinspection PyProtectedMember
+            await self.client._execute(
+                action=sc_pb.RequestAction(
+                    actions=[
+                        sc_pb.Action(
+                            action_raw=raw_pb.ActionRaw(
+                                unit_command=raw_pb.ActionRawUnitCommand(
+                                    ability_id=order.value,
+                                    target_unit_tag=target,
+                                    unit_tags=unit_tags,
+                                )
+                            )
+                        ),
+                    ]
+                )
+            )
+
+    @staticmethod
+    def valid_two_by_two_position(
+        position: Point2, placement_grid: np.ndarray
+    ) -> Tuple[bool, np.ndarray]:
+        """
+        Have a possible building pos, see if it can go there
+        :param position:
+        :param placement_grid:
+        :return:is valid bool, updated placement grid
+        """
+        points_to_check: List[List[int]] = [[0, 0] for _ in range(4)]
+        # (x, y)
+        points_to_check[0][0] = position[0]
+        points_to_check[0][1] = position[1]
+        # (x - 1, y)
+        points_to_check[1][0] = position[0] - 1
+        points_to_check[1][1] = position[1]
+        # (x, y - 1)
+        points_to_check[2][0] = position[0]
+        points_to_check[2][1] = position[1] - 1
+        # (x - 1, y - 1)
+        points_to_check[3][0] = position[0] - 1
+        points_to_check[3][1] = position[1] - 1
+
+        valid: bool = True
+        for point in points_to_check:
+            x = point[0]
+            y = point[1]
+            if (
+                x >= placement_grid.shape[0]
+                or x < 0
+                or y >= placement_grid.shape[1]
+                or y < 0
+            ):
+                return False, placement_grid
+
+            if placement_grid[point[0]][point[1]] == 0:
+                valid = False
+                break
+
+        if valid:
+            # update our copy of placement grid
+            for point in points_to_check:
+                placement_grid[point[0]][point[1]] = 0
+
+        return valid, placement_grid
+
+    @staticmethod
+    def get_total_supply(units: Units) -> int:
+        """
+        Get total supply of units.
+        @param units:
+        @return:
+        """
+        return sum(
+            [
+                UNIT_DATA[unit.type_id]["supply"]
+                for unit in units
+                # yes we did have a crash getting supply of a nuke!
+                if unit.type_id not in ALL_STRUCTURES
+                and unit.type_id != UnitTypeId.NUKE
+            ]
+        )

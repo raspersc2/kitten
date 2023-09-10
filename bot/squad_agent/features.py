@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union
+from typing import TYPE_CHECKING, List, Tuple, Union
 
 import numpy as np
 import torch
@@ -8,8 +8,10 @@ from sc2.position import Point2
 from torch import Tensor
 from torch.nn.functional import one_hot
 
-from bot.botai_ext import BotAIExt
 from bot.consts import BUFF_TYPES, UNIT_TYPES, ConfigSettings
+
+if TYPE_CHECKING:
+    from ares import AresBot
 
 # since we one hot encode unit type ids
 # we don't want to hot encode 1961+ different values
@@ -31,8 +33,8 @@ NUM_UPGRADES: int = len(UpgradeId)
 
 
 class Features:
-    def __init__(self, ai: BotAIExt, config: dict, max_entities: int, device) -> None:
-        self.ai: BotAIExt = ai
+    def __init__(self, ai: "AresBot", config: dict, max_entities: int, device) -> None:
+        self.ai: AresBot = ai
         self.units: List = []
         self.tags: List[int] = []
         self.max_entities: int = max_entities

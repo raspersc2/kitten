@@ -3,7 +3,9 @@ import sys
 
 from sc2.bot_ai import BotAI
 
-sys.path.insert(1, "python-sc2")
+sys.path.append("ares-sc2/src/ares")
+sys.path.append("ares-sc2/src")
+sys.path.append("ares-sc2")
 
 from sc2 import maps
 from sc2.data import Difficulty, Race
@@ -66,7 +68,7 @@ if __name__ == "__main__":
                 # bot2,
             ],
             realtime=False,
-            # save_replay_as="kitten.SC2Replay",
+            save_replay_as="kitten.SC2Replay",
             # 2 lower spawn / 2564 upper spawn
             # random_seed=2,
         )

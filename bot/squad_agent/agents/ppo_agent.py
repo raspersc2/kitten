@@ -15,9 +15,7 @@ from sc2.position import Point2
 from sc2.units import Units
 from torch import Tensor, nn, optim
 
-from bot.botai_ext import BotAIExt
 from bot.consts import SQUAD_ACTIONS, ConfigSettings
-from bot.modules.pathing import Pathing
 from bot.squad_agent.agents.base_agent import BaseAgent
 from bot.squad_agent.architecture.ppo.actor_critic import ActorCritic
 from bot.squad_agent.features import Features
@@ -32,7 +30,6 @@ SCALAR_SHAPE: tuple[int, int] = (1, 8)
 class PPOAgent(BaseAgent):
     __slots__ = (
         "features",
-        "pathing",
         "model",
         "optimizer",
         "initial_lstm_state",
@@ -62,7 +59,7 @@ class PPOAgent(BaseAgent):
         "policy_loss",
     )
 
-    def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing):
+    def __init__(self, ai, config: Dict):
         # we will use the aiarena docker to play multiple simultaneous games
         # to collect state, action, rewards etc.
         # so use "cpu" here and
@@ -70,12 +67,11 @@ class PPOAgent(BaseAgent):
         super().__init__(ai, config, "cpu")
 
         self.features: Features = Features(ai, config, 256, self.device)
-        self.pathing: Pathing = pathing
 
         ppo_settings: dict = self.config[ConfigSettings.SQUAD_AGENT][ConfigSettings.PPO]
         self.num_rollout_steps: int = ppo_settings[ConfigSettings.NUM_ROLLOUT_STEPS]
 
-        grid = self.pathing.map_data.get_pyastar_grid()
+        grid = self.ai.mediator.get_ground_grid
 
         self.model = ActorCritic(
             len(SQUAD_ACTIONS),
@@ -162,8 +158,8 @@ class PPOAgent(BaseAgent):
         )
         reward: float = self.reward
         obs = self.features.transform_obs(
-            self.pathing.ground_grid,
-            self.pathing.effects_grid,
+            self.ai.mediator.get_ground_grid,
+            self.ai.mediator.get_ground_avoidance_grid,
             pos_of_squad,
             attack_target,
             rally_point,

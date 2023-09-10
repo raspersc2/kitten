@@ -3,31 +3,30 @@ Basic macro that focuses on bio production and upgrades
 This should probably be rewritten /
     refactored into separate files for anything more complicated
 """
-from typing import List, Optional, Set
+from typing import TYPE_CHECKING
 
+from ares.behaviors.macro import BuildStructure, SpawnController, AutoSupply
+from ares.consts import UnitRole
+from ares.cython_extensions.units_utils import cy_closest_to
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
-from sc2.position import Point2, Point3, Pointlike
+from sc2.position import Point2, Pointlike
 from sc2.units import Units
 
-from bot.botai_ext import BotAIExt
-from bot.consts import UnitRoleTypes
-from bot.modules.unit_roles import UnitRoles
 from bot.modules.workers import WorkersManager
 from bot.state import State
-from MapAnalyzer import MapData, Region
+
+if TYPE_CHECKING:
+    from ares import AresBot
 
 
 class Macro:
     __slots__ = (
         "ai",
-        "unit_roles",
         "workers_manager",
-        "map_data",
         "debug",
         "state",
-        "depot_positions",
         "max_workers",
     )
 
@@ -35,92 +34,64 @@ class Macro:
 
     def __init__(
         self,
-        ai: BotAIExt,
-        unit_roles: UnitRoles,
+        ai: "AresBot",
         workers_manager: WorkersManager,
-        map_data: MapData,
         debug: bool,
     ):
-        self.ai: BotAIExt = ai
-        self.unit_roles: UnitRoles = unit_roles
+        self.ai: AresBot = ai
         self.workers_manager: WorkersManager = workers_manager
-        self.map_data: MapData = map_data
         self.debug: bool = debug
-        ramp = self.ai.main_base_ramp
-        corner_depots = list(ramp.corner_depots)
-        self.depot_positions: List[Point2] = [
-            ramp.depot_in_middle,
-            corner_depots[0],
-            corner_depots[1],
-        ]
         self.max_workers: int = 19
-        self._calculate_supply_placements()
 
     async def update(self, state: State, iteration: int) -> None:
         self.state = state
+
+        tags_received_action: set[int] = await self._build_addons()
+        self.ai.register_behavior(
+            SpawnController(
+                army_composition_dict={
+                    UnitTypeId.MARINE: {
+                        "proportion": 0.6,
+                        "priority": 2,
+                    },  # lowest priority
+                    UnitTypeId.MEDIVAC: {"proportion": 0.25, "priority": 1},
+                    UnitTypeId.MARAUDER: {
+                        "proportion": 0.15,
+                        "priority": 0,
+                    },  # highest priority
+                },
+                freeflow_mode=True,
+                ignored_build_from_tags=tags_received_action
+            )
+        )
+
+        if not self.ai.build_order_runner.build_completed:
+            return
+
         if len(self.ai.townhalls) > 1:
             self.max_workers = 41
 
         self._manage_upgrades()
         self._build_refineries()
-        await self._build_supply(iteration)
+        self.ai.register_behavior(AutoSupply(self.state.main_build_area))
         self._produce_workers()
-        await self._build_addons()
-        self._produce_army()
+
         await self._build_factory()
         await self._build_starport()
         await self._build_barracks()
         await self._build_bays()
 
-        # catch any scvs not doing anything and send back to mining
-        if building_scvs := self.unit_roles.get_units_from_role(
-            UnitRoleTypes.BUILDING
-        ).filter(lambda u: len(u.orders) == 0 or u.is_carrying_vespene or u.is_idle):
-            for scv in building_scvs:
-                self.unit_roles.assign_role(scv.tag, UnitRoleTypes.GATHERING)
-
         # 2 townhalls at all times
         if len(self.ai.townhalls) < 2 and self.ai.can_afford(UnitTypeId.COMMANDCENTER):
-            location: Optional[Point2] = await self.ai.get_next_expansion()
-            if location:
-                await self._build_structure(
-                    UnitTypeId.COMMANDCENTER,
-                    self.state.natural_build_area,
-                    specific_location=location,
-                )
-
-        # not the greatest solution here, and should be improved
-        # but better then nothing
-        for structure in self.ai.structures_without_construction_SCVs:
-            structure(AbilityId.CANCEL_BUILDINPROGRESS)
-
-        if self.debug:
-            for position in self.depot_positions:
-                pos: Point3 = Point3(
-                    (position.x, position.y, self.ai.get_terrain_z_height(position))
-                )
-                self.ai.client.debug_box2_out(pos)
-
-    def _produce_army(self) -> None:
-        if not self.ai.can_afford(UnitTypeId.MARINE) or self.ai.supply_left <= 0:
-            return
-        barracks: Units = self.state.barracks.filter(lambda u: u.is_ready and u.is_idle)
-        ports: Units = self.state.starports.filter(lambda u: u.is_ready and u.is_idle)
-
-        for rax in barracks:
-            if self.ai.supply_left <= 0:
-                break
-            if rax.has_techlab and self.ai.minerals >= 100:
-                if self.ai.can_afford(UnitTypeId.MARAUDER):
-                    self.ai.train(UnitTypeId.MARAUDER)
-                continue
-            self.ai.train(UnitTypeId.MARINE)
-
-        for _ in ports:
-            if self.ai.supply_left <= 0:
-                break
-            if self.ai.can_afford(UnitTypeId.MEDIVAC):
-                self.ai.train(UnitTypeId.MEDIVAC)
+            if location := await self.ai.get_next_expansion():
+                if worker := self.ai.mediator.select_worker(
+                    target_position=self.ai.start_location
+                ):
+                    self.ai.mediator.build_with_specific_worker(
+                        worker=worker,
+                        structure_type=UnitTypeId.COMMANDCENTER,
+                        pos=location,
+                    )
 
     def _produce_workers(self) -> None:
         if (
@@ -141,50 +112,17 @@ class Macro:
             for th in self.state.orbitals.idle:
                 th.train(UnitTypeId.SCV)
 
-    async def _build_supply(self, iteration: int) -> None:
-        # lower existing depots
-        if iteration % 12 == 0:
-            for depot in self.state.depots.ready:
-                depot(AbilityId.MORPH_SUPPLYDEPOT_LOWER)
+    def _pending_structures(self, structure_type: UnitTypeId) -> int:
+        return (
+            int(self.ai.already_pending(structure_type))
+            + self.ai.mediator.get_building_counter[structure_type]
+        )
 
-        num_rax: int = len(self.state.barracks)
-        max_building: int = 1 if num_rax < 3 else (2 if num_rax < 8 else 3)
-        build_when_supply_left: int = 10 if num_rax >= 8 else 5
-        if (
-            self.ai.supply_used < 14
-            or self.ai.supply_left >= build_when_supply_left
-            or self.ai.supply_cap >= 200
-            or self.ai.already_pending(UnitTypeId.SUPPLYDEPOT) >= max_building
-            or not self.ai.can_afford(UnitTypeId.SUPPLYDEPOT)
-            or not self.ai.townhalls
-        ):
-            return
-
-        # try to build depot at one of our precalculated spots
-        if len(self.depot_positions) > 0:
-            pos: Point2 = self.depot_positions[0]
-            # this might rarely happen, remove the point,
-            # return and try with new point next time
-            if not self.ai.in_placement_grid(pos):
-                self.depot_positions = self.depot_positions[1:]
-                return
-
-            self.depot_positions = self.depot_positions[1:]
-            await self._build_structure(
-                UnitTypeId.SUPPLYDEPOT,
-                self.state.main_build_area,
-                specific_location=pos,
-            )
-        # else generic depot placement
-        else:
-            await self._build_structure(
-                UnitTypeId.SUPPLYDEPOT, self.state.natural_build_area
-            )
-
-    async def _build_addons(self) -> None:
+    async def _build_addons(self) -> set[int]:
+        tags_received_action: set[int] = set()
         ready_rax: Units = self.state.barracks.filter(lambda u: u.is_ready)
-        if len(ready_rax) < 3 or self.ai.vespene < 25:
-            return
+        if len(ready_rax) < 2 or self.ai.vespene < 25:
+            return tags_received_action
 
         add_ons: Units = self.ai.structures(UnitTypeId.BARRACKSTECHLAB)
         max_add_ons: int = 2 if len(self.state.barracks) > 5 else 1
@@ -195,6 +133,9 @@ class Macro:
                     add_on_location: Pointlike = b.position.offset(Point2((2.5, -0.5)))
                     if await self.ai.can_place(UnitTypeId.SUPPLYDEPOT, add_on_location):
                         b.build(UnitTypeId.STARPORTTECHLAB)
+                        tags_received_action.add(b.tag)
+
+        return tags_received_action
 
     async def _build_barracks(self) -> None:
         max_barracks: int = (
@@ -202,23 +143,19 @@ class Macro:
         )
         if self.ai.minerals > 500:
             max_barracks = 9
-
+        max_pending: int = 1 if self.ai.minerals < 400 else 5
         rax: Units = self.state.barracks
         if self._dont_build(
             rax,
             UnitTypeId.BARRACKS,
             num_existing=max_barracks,
-            max_pending=5,
+            max_pending=max_pending,
         ):
             return
 
-        build_area: Point2 = (
-            self.state.main_build_area
-            if len(rax) < 5
-            else self.state.natural_build_area
+        self.ai.register_behavior(
+            BuildStructure(self.state.main_build_area, UnitTypeId.BARRACKS)
         )
-
-        await self._build_structure(UnitTypeId.BARRACKS, build_area)
 
     def _manage_upgrades(self) -> None:
         ccs: Units = self.state.ccs
@@ -262,85 +199,30 @@ class Macro:
             self.ai.research(UpgradeId.TERRANINFANTRYARMORSLEVEL1)
             return
 
-    async def _build_structure(
-        self,
-        structure_type: UnitTypeId,
-        placement_area: Point2,
-        specific_location: Optional[Point2] = None,
-        placement_step: int = 3,
-    ) -> None:
-        location: Point2
-        if specific_location:
-            location = specific_location
-        else:
-            location = await self.ai.find_placement(
-                structure_type, placement_area, placement_step=placement_step
-            )
-        if location:
-            if worker := self.workers_manager.select_worker(location, force=True):
-                self.unit_roles.assign_role(worker.tag, UnitRoleTypes.BUILDING)
-                self.workers_manager.remove_worker_from_mineral(worker.tag)
-                worker.build(structure_type, location)
-
     def _build_refineries(self) -> None:
         if len(self.ai.gas_buildings) == 2:
             return
 
-        pending = self.ai.already_pending(UnitTypeId.REFINERY)
+        pending = self._pending_structures(UnitTypeId.REFINERY)
         if pending:
             return
 
         num_rax: int = len(self.state.barracks)
-        max_gas: int = 2 if num_rax >= 4 else 0
+        max_gas: int = 2 if num_rax >= 4 else (1 if num_rax >= 2 else 0)
         current_gas_num = pending + self.ai.gas_buildings.amount
-        # Build refineries when at least one barracks is in construction
-        if current_gas_num >= max_gas or not self.ai.can_afford(UnitTypeId.REFINERY):
-            return
-
-        # Loop over all townhalls nearly complete
-        for th in self.ai.townhalls.filter(lambda _th: _th.build_progress > 0.6):
-            # Find all vespene geysers that are closer than range 10 to this townhall
-            vgs: Units = self.ai.vespene_geyser.closer_than(10, th)
-            for vg in vgs:
-                if self.ai.gas_buildings.filter(lambda gb: gb.distance_to(vg) < 3.0):
-                    continue
-
-                if worker := self.workers_manager.select_worker(
-                    vg.position, force=True
-                ):
-                    self.unit_roles.assign_role(worker.tag, UnitRoleTypes.BUILDING)
-                    self.workers_manager.remove_worker_from_mineral(worker.tag)
-                    worker.build_gas(vg)
-                    break
-
-    def _calculate_supply_placements(self) -> None:
-        """
-        Depots placements around the edge of the main base to make room
-        TODO: Current status -> Good enough
-            But try to get depot placements all round the edge
-        """
-        region: Optional[Region] = self.map_data.in_region_p(self.ai.start_location)
-        if not region:
-            return
-        # reposition these points slightly inwards
-        potential_depot_positions: Set[Point2] = {
-            p.towards(region.center, 2.0).rounded
-            for p in region.perimeter_points
-            if self.ai.in_placement_grid(p.towards(region.center, 2.0).rounded)
-            and p.distance_to(self.ai.main_base_ramp.top_center) > 5.5
-        }
-
-        placement_grid = self.ai.game_info.placement_grid.data_numpy.copy()
-        for pos in potential_depot_positions:
-            valid, placement_grid = self.ai.valid_two_by_two_position(
-                pos, placement_grid
-            )
-            if valid:
-                self.depot_positions.append(pos)
-
-        self.depot_positions = sorted(
-            self.depot_positions, key=lambda x: x.distance_to(self.ai.start_location)
-        )
+        if current_gas_num < max_gas and self.ai.can_afford(UnitTypeId.REFINERY):
+            if worker := self.ai.mediator.select_worker(
+                target_position=self.ai.start_location
+            ):
+                geysers: Units = self.ai.vespene_geyser.filter(
+                    lambda vg: not self.ai.gas_buildings.closer_than(2, vg)
+                )
+                self.ai.mediator.build_with_specific_worker(
+                    worker=worker,
+                    structure_type=UnitTypeId.REFINERY,
+                    pos=cy_closest_to(self.ai.start_location, geysers),
+                )
+                self.ai.mediator.assign_role(tag=worker.tag, role=UnitRole.BUILDING)
 
     async def _build_factory(self) -> None:
         factories: Units = self.state.factories
@@ -352,14 +234,18 @@ class Macro:
         if self._dont_build(factories, UnitTypeId.FACTORY):
             return
 
-        await self._build_structure(UnitTypeId.FACTORY, self.state.main_build_area)
+        self.ai.register_behavior(
+            BuildStructure(self.state.main_build_area, UnitTypeId.FACTORY)
+        )
 
     async def _build_starport(self) -> None:
         ports: Units = self.state.starports
         if self._dont_build(ports, UnitTypeId.STARPORT):
             return
 
-        await self._build_structure(UnitTypeId.STARPORT, self.state.main_build_area)
+        self.ai.register_behavior(
+            BuildStructure(self.state.main_build_area, UnitTypeId.STARPORT)
+        )
 
     def _dont_build(
         self,
@@ -372,7 +258,12 @@ class Macro:
             self.ai.tech_requirement_progress(structure_type) != 1
             or len(structures) >= num_existing
             or not self.ai.can_afford(structure_type)
-            or self.ai.already_pending(structure_type) >= max_pending
+            or self._pending_structures(structure_type) >= max_pending
+            or self.ai.calculate_cost(structure_type).minerals > self.ai.minerals - 75
+            or (
+                self.ai.calculate_cost(structure_type).vespene > self.ai.vespene - 25
+                and structure_type != UnitTypeId.BARRACKS
+            )
         )
 
     async def _build_bays(self) -> None:
@@ -382,4 +273,6 @@ class Macro:
         if self._dont_build(bays, bay_type) or len(self.state.starports) < 1:
             return
 
-        await self._build_structure(bay_type, self.state.main_build_area)
+        self.ai.register_behavior(
+            BuildStructure(self.state.main_build_area, UnitTypeId.ENGINEERINGBAY)
+        )

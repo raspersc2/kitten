@@ -1,3 +1,4 @@
+import pickle
 from os import path
 from typing import Dict, List
 
@@ -10,9 +11,7 @@ from sc2.units import Units
 from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
 
-from bot.botai_ext import BotAIExt
 from bot.consts import ConfigSettings
-from bot.modules.pathing import Pathing
 from bot.squad_agent.agents.base_agent import BaseAgent
 from bot.squad_agent.architecture.dqn_rainbow.model import Model
 from bot.squad_agent.architecture.dqn_rainbow.replay_buffer import (
@@ -21,11 +20,10 @@ from bot.squad_agent.architecture.dqn_rainbow.replay_buffer import (
 )
 from bot.squad_agent.features import Features
 from bot.squad_agent.utils import load_checkpoint, save_checkpoint
-import pickle
 
 
 class DQNRainbowAgent(BaseAgent):
-    def __init__(self, ai: BotAIExt, config: Dict, pathing: Pathing) -> None:
+    def __init__(self, ai, config: Dict) -> None:
         super().__init__(ai, config)
         state_dir: str = self.config[ConfigSettings.SQUAD_AGENT][
             ConfigSettings.STATE_DIRECTORY
@@ -45,9 +43,8 @@ class DQNRainbowAgent(BaseAgent):
         self.prev_episode_reward: float = (
             5.0 if self.all_episode_data[-1]["Result"] == 2 else -5.0
         )
-        self.pathing: Pathing = pathing
         dqn_settings: dict = self.config[ConfigSettings.SQUAD_AGENT][ConfigSettings.DQN]
-        grid = self.pathing.map_data.get_pyastar_grid()
+        grid = self.ai.mediator.get_ground_grid
         obs_dim = 292
         action_dim = 5
         self.batch_size = dqn_settings[ConfigSettings.BATCH_SIZE]
