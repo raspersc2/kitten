@@ -17,6 +17,7 @@ torch = "^2.0.1"
 torchvision = "^0.15.0"
 matplotlib = "^3.6.3"
 ipython = "^8.8.0"
+ipykernel = "^6.25.2"
 
 
 [tool.poetry.group.lint.dependencies]

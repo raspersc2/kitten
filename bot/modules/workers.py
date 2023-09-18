@@ -31,7 +31,7 @@ class WorkersManager:
         self.issued_scout_commands: bool = False
 
     def update(self, state: State, iteration: int) -> None:
-        self.ai.register_behavior(Mining(mineral_boost=False))
+        self.ai.register_behavior(Mining(mineral_boost=False, keep_safe=False))
 
         for oc in state.orbitals.filter(lambda x: x.energy >= 50):
             mfs: Units = self.ai.mineral_field.closer_than(10, oc)
@@ -92,6 +92,9 @@ class WorkersManager:
             )
             if defence_workers and enemy_workers:
                 for worker in defence_workers:
+                    if worker.weapon_cooldown == 0 and worker.is_attacking:
+                        continue
+
                     # in attack range of enemy, prioritise attacking
                     if (
                         worker.weapon_cooldown == 0

@@ -7,6 +7,7 @@ import uuid
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Set
 
 from ares.consts import UnitRole
+from ares.cython_extensions.geometry import cy_distance_to
 from loguru import logger
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
@@ -177,9 +178,6 @@ class UnitSquads:
             )
 
     def _squad_assignment(self, unassigned_units: Units) -> None:
-        if not unassigned_units:
-            return
-
         for unit in unassigned_units:
             tag: int = unit.tag
             # check if unit may join an existing squad
@@ -226,8 +224,7 @@ class UnitSquads:
         for squad in self.squads:
             if squad.squad_id == avoid_squad_id:
                 continue
-
-            current_distance: float = position.distance_to(squad.squad_position)
+            current_distance: float = cy_distance_to(position, squad.squad_position)
             if current_distance < min_distance:
                 closest_squad = squad
                 min_distance = current_distance
@@ -362,8 +359,8 @@ class UnitSquads:
         # head towards enemy expansions outside natural by default
         if townhalls := self.ai.enemy_structures.filter(
             lambda s: s.type_id in TOWNHALL_TYPES
-            and s.distance_to(self.ai.mediator.get_enemy_nat) > 12.0
-            and s.distance_to(self.ai.enemy_start_locations[0]) > 12.0
+            and cy_distance_to(s.position, self.ai.mediator.get_enemy_nat) > 12.0
+            and cy_distance_to(s.position, self.ai.enemy_start_locations[0]) > 12.0
         ):
             self.attack_target = townhalls.furthest_to(
                 self.ai.enemy_start_locations[0]

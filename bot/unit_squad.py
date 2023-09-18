@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Dict, Set, Union
 
+from ares.cython_extensions.geometry import cy_distance_to
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
@@ -106,7 +107,7 @@ class UnitSquad:
         if (
             target
             and isinstance(target, Point2)
-            and target.distance_to(self.current_action_position) < 8.0
+            and cy_distance_to(target.position, self.current_action_position) < 8.0
         ):
             return
 
@@ -175,7 +176,7 @@ class UnitSquad:
             await self.ai.give_units_same_order(AbilityId.MOVE, squad_tags, pos)
 
     async def _do_squad_move_action(self, squad_tags: Set[int]) -> None:
-        if self.squad_position.distance_to(self.current_action_position) < 3.0:
+        if cy_distance_to(self.squad_position, self.current_action_position) < 3.0:
             return
 
         sample_unit: Unit = self.squad_units[0]
@@ -191,7 +192,7 @@ class UnitSquad:
         if (
             order_target
             and isinstance(order_target, Point2)
-            and sample_unit.distance_to(pos) < 2.5
+            and cy_distance_to(sample_unit.position, pos) < 2.5
         ):
             return
 
@@ -199,7 +200,7 @@ class UnitSquad:
         if (
             order_target
             and isinstance(order_target, Point2)
-            and order_target.distance_to(pos) < 4.5
+            and cy_distance_to(order_target, pos) < 4.5
         ):
             return
 

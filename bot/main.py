@@ -1,9 +1,8 @@
 from typing import Dict, List, Optional, Set, Tuple, Union
 
-import numpy as np
-import yaml  # type: ignore
+import yaml
 from ares import AresBot
-from ares.consts import ALL_STRUCTURES
+from ares.consts import ALL_STRUCTURES, UnitRole
 from ares.dicts.unit_data import UNIT_DATA
 from s2clientprotocol import raw_pb2 as raw_pb
 from s2clientprotocol import sc2api_pb2 as sc_pb
@@ -15,7 +14,6 @@ from sc2.unit import Unit
 from sc2.units import Units
 from scipy.spatial import KDTree
 
-from ares.consts import UnitRole
 from bot.consts import AgentClass, ConfigSettings
 from bot.modules.macro import Macro
 from bot.modules.map_scouter import MapScouter
@@ -92,7 +90,6 @@ class Kitten(AresBot):
 
     async def on_step(self, iteration: int) -> None:
         await super(Kitten, self).on_step(iteration)
-
         if self.time > 1200.0:
             await self.client.leave()
         state: State = State(self)
@@ -256,53 +253,6 @@ class Kitten(AresBot):
                     ]
                 )
             )
-
-    @staticmethod
-    def valid_two_by_two_position(
-        position: Point2, placement_grid: np.ndarray
-    ) -> Tuple[bool, np.ndarray]:
-        """
-        Have a possible building pos, see if it can go there
-        :param position:
-        :param placement_grid:
-        :return:is valid bool, updated placement grid
-        """
-        points_to_check: List[List[int]] = [[0, 0] for _ in range(4)]
-        # (x, y)
-        points_to_check[0][0] = position[0]
-        points_to_check[0][1] = position[1]
-        # (x - 1, y)
-        points_to_check[1][0] = position[0] - 1
-        points_to_check[1][1] = position[1]
-        # (x, y - 1)
-        points_to_check[2][0] = position[0]
-        points_to_check[2][1] = position[1] - 1
-        # (x - 1, y - 1)
-        points_to_check[3][0] = position[0] - 1
-        points_to_check[3][1] = position[1] - 1
-
-        valid: bool = True
-        for point in points_to_check:
-            x = point[0]
-            y = point[1]
-            if (
-                x >= placement_grid.shape[0]
-                or x < 0
-                or y >= placement_grid.shape[1]
-                or y < 0
-            ):
-                return False, placement_grid
-
-            if placement_grid[point[0]][point[1]] == 0:
-                valid = False
-                break
-
-        if valid:
-            # update our copy of placement grid
-            for point in points_to_check:
-                placement_grid[point[0]][point[1]] = 0
-
-        return valid, placement_grid
 
     @staticmethod
     def get_total_supply(units: Units) -> int:

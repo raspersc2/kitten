@@ -2,6 +2,7 @@ import itertools
 from typing import TYPE_CHECKING, Any, Iterator
 
 from ares.consts import UnitRole, UnitTreeQueryType
+from ares.cython_extensions.units_utils import cy_closest_to
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.position import Point2
 from sc2.unit import Unit
@@ -53,7 +54,7 @@ class MapScouter:
             role=UnitRole.ATTACKING, unit_type=UnitTypeId.MARINE
         ):
             if len(steal_from) > 15:
-                marine: Unit = steal_from.closest_to(self.ai.start_location)
+                marine: Unit = cy_closest_to(self.ai.start_location, steal_from)
                 self.ai.mediator.assign_role(
                     tag=marine.tag, role=UnitRole.CONTROL_GROUP_ONE
                 )
@@ -66,7 +67,7 @@ class MapScouter:
             enemy: list[Units] = self.ai.mediator.get_units_in_range(
                 start_points=[scout.position],
                 distances=[15.0],
-                query_tree=UnitTreeQueryType.AllEnemy
+                query_tree=UnitTreeQueryType.AllEnemy,
             )
             if len(enemy) > 0:
                 self.next_base_location = next(self.expansions_generator)

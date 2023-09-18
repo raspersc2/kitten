@@ -33,11 +33,12 @@ BuildChoices:
 
 Builds:
     BarracksOpener:
-        ConstantWorkerProductionTill: 20
+        ConstantWorkerProductionTill: 30
         OpeningBuildOrder:
             - 14 supply @ ramp
-            - 16 barracks @ ramp
+            - 16 barracks
             - 17 barracks
+            - 19 orbital
+            - 19 gas
             - 19 supply
-            - 10 orbital
-            - 15 expand
+            - 20 expand

@@ -3,15 +3,16 @@ Basic macro that focuses on bio production and upgrades
 This should probably be rewritten /
     refactored into separate files for anything more complicated
 """
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
-from ares.behaviors.macro import BuildStructure, SpawnController, AutoSupply
+from ares.behaviors.macro import AutoSupply, BuildStructure, SpawnController
 from ares.consts import UnitRole
 from ares.cython_extensions.units_utils import cy_closest_to
 from sc2.ids.ability_id import AbilityId
 from sc2.ids.unit_typeid import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
 from sc2.position import Point2, Pointlike
+from sc2.unit import Unit
 from sc2.units import Units
 
 from bot.modules.workers import WorkersManager
@@ -61,7 +62,7 @@ class Macro:
                     },  # highest priority
                 },
                 freeflow_mode=True,
-                ignored_build_from_tags=tags_received_action
+                ignored_build_from_tags=tags_received_action,
             )
         )
 
@@ -71,18 +72,22 @@ class Macro:
         if len(self.ai.townhalls) > 1:
             self.max_workers = 41
 
+        self._build_factory()
+        self._build_starport()
+
         self._manage_upgrades()
         self._build_refineries()
         self.ai.register_behavior(AutoSupply(self.state.main_build_area))
         self._produce_workers()
-
-        await self._build_factory()
-        await self._build_starport()
-        await self._build_barracks()
-        await self._build_bays()
+        self._build_barracks()
+        self._build_bays()
 
         # 2 townhalls at all times
-        if len(self.ai.townhalls) < 2 and self.ai.can_afford(UnitTypeId.COMMANDCENTER):
+        if (
+            len(self.ai.townhalls) < 2
+            and self.ai.can_afford(UnitTypeId.COMMANDCENTER)
+            and self._pending_structures(UnitTypeId.COMMANDCENTER) == 0
+        ):
             if location := await self.ai.get_next_expansion():
                 if worker := self.ai.mediator.select_worker(
                     target_position=self.ai.start_location
@@ -105,7 +110,8 @@ class Macro:
         # no rax yet, all ths can build scvs
         if self.state.barracks.ready.amount < 1:
             for th in self.ai.townhalls.idle:
-                th.train(UnitTypeId.SCV)
+                if th.is_ready:
+                    th.train(UnitTypeId.SCV)
         # rax present, only orbitals / pfs can build scvs
         # TODO: Adjust this if we build PFs
         else:
@@ -121,23 +127,23 @@ class Macro:
     async def _build_addons(self) -> set[int]:
         tags_received_action: set[int] = set()
         ready_rax: Units = self.state.barracks.filter(lambda u: u.is_ready)
-        if len(ready_rax) < 2 or self.ai.vespene < 25:
+        if len(ready_rax) < 3 or self.ai.vespene < 25:
             return tags_received_action
 
-        add_ons: Units = self.ai.structures(UnitTypeId.BARRACKSTECHLAB)
+        add_ons: list[Unit] = self.ai.mediator.get_own_structures_dict[
+            UnitTypeId.BARRACKSTECHLAB
+        ]
         max_add_ons: int = 2 if len(self.state.barracks) > 5 else 1
         if len(add_ons) < max_add_ons and self.ai.can_afford(UnitTypeId.TECHLAB):
             rax: Units = ready_rax.filter(lambda u: u.is_idle)
             for b in rax:
                 if not b.has_add_on:
-                    add_on_location: Pointlike = b.position.offset(Point2((2.5, -0.5)))
-                    if await self.ai.can_place(UnitTypeId.SUPPLYDEPOT, add_on_location):
-                        b.build(UnitTypeId.STARPORTTECHLAB)
-                        tags_received_action.add(b.tag)
+                    b.build(UnitTypeId.STARPORTTECHLAB)
+                    tags_received_action.add(b.tag)
 
         return tags_received_action
 
-    async def _build_barracks(self) -> None:
+    def _build_barracks(self) -> None:
         max_barracks: int = (
             2 if len(self.ai.townhalls) <= 1 else (4 if not self.state.factories else 8)
         )
@@ -159,15 +165,24 @@ class Macro:
 
     def _manage_upgrades(self) -> None:
         ccs: Units = self.state.ccs
-        if ccs and self.ai.can_afford(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND):
+        if (
+            ccs
+            and ccs.ready
+            and self.ai.can_afford(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND)
+        ):
             ccs.first(AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND)
 
         if not self.state.factories:
             return
 
-        if self.ai.structures.filter(
-            lambda u: u.type_id == UnitTypeId.BARRACKSTECHLAB and u.is_idle
-        ):
+        idle_rax_tech_labs: list[Unit] = [
+            tl
+            for tl in self.ai.mediator.get_own_structures_dict[
+                UnitTypeId.BARRACKSTECHLAB
+            ]
+            if tl.is_idle
+        ]
+        if len(idle_rax_tech_labs) > 0:
             if self.ai.already_pending_upgrade(
                 UpgradeId.SHIELDWALL
             ) == 0 and self.ai.can_afford(UpgradeId.SHIELDWALL):
@@ -189,13 +204,13 @@ class Macro:
 
         if self.ai.already_pending_upgrade(
             UpgradeId.TERRANINFANTRYWEAPONSLEVEL1
-        ) == 0 and self.ai.can_afford(UpgradeId.PUNISHERGRENADES):
+        ) == 0 and self.ai.can_afford(UpgradeId.TERRANINFANTRYWEAPONSLEVEL1):
             self.ai.research(UpgradeId.TERRANINFANTRYWEAPONSLEVEL1)
             return
 
         if self.ai.already_pending_upgrade(
             UpgradeId.TERRANINFANTRYARMORSLEVEL1
-        ) == 0 and self.ai.can_afford(UpgradeId.PUNISHERGRENADES):
+        ) == 0 and self.ai.can_afford(UpgradeId.TERRANINFANTRYARMORSLEVEL1):
             self.ai.research(UpgradeId.TERRANINFANTRYARMORSLEVEL1)
             return
 
@@ -208,7 +223,7 @@ class Macro:
             return
 
         num_rax: int = len(self.state.barracks)
-        max_gas: int = 2 if num_rax >= 4 else (1 if num_rax >= 2 else 0)
+        max_gas: int = 2 if num_rax >= 3 else (1 if num_rax >= 2 else 0)
         current_gas_num = pending + self.ai.gas_buildings.amount
         if current_gas_num < max_gas and self.ai.can_afford(UnitTypeId.REFINERY):
             if worker := self.ai.mediator.select_worker(
@@ -224,7 +239,7 @@ class Macro:
                 )
                 self.ai.mediator.assign_role(tag=worker.tag, role=UnitRole.BUILDING)
 
-    async def _build_factory(self) -> None:
+    def _build_factory(self) -> None:
         factories: Units = self.state.factories
 
         # we only care about factories for the starport
@@ -238,7 +253,7 @@ class Macro:
             BuildStructure(self.state.main_build_area, UnitTypeId.FACTORY)
         )
 
-    async def _build_starport(self) -> None:
+    def _build_starport(self) -> None:
         ports: Units = self.state.starports
         if self._dont_build(ports, UnitTypeId.STARPORT):
             return
@@ -249,7 +264,7 @@ class Macro:
 
     def _dont_build(
         self,
-        structures: Units,
+        structures: Union[Units, list[Unit]],
         structure_type: UnitTypeId,
         num_existing: int = 1,
         max_pending: int = 1,
@@ -257,7 +272,6 @@ class Macro:
         return (
             self.ai.tech_requirement_progress(structure_type) != 1
             or len(structures) >= num_existing
-            or not self.ai.can_afford(structure_type)
             or self._pending_structures(structure_type) >= max_pending
             or self.ai.calculate_cost(structure_type).minerals > self.ai.minerals - 75
             or (
@@ -266,9 +280,9 @@ class Macro:
             )
         )
 
-    async def _build_bays(self) -> None:
+    def _build_bays(self) -> None:
         bay_type: UnitTypeId = UnitTypeId.ENGINEERINGBAY
-        bays = self.ai.structures(bay_type)
+        bays: list[Unit] = self.ai.mediator.get_own_structures_dict[bay_type]
 
         if self._dont_build(bays, bay_type) or len(self.state.starports) < 1:
             return
